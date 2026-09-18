@@ -6,6 +6,7 @@ export const TASK_FONT_SCALE_PRESETS = [90, 100, 110, 120, 130] as const;
 
 export const GOOGLE_FONT_PRESETS = [
   'Inter',
+  'Noto Sans SC',
   'Be Vietnam Pro',
   'Roboto',
   'Noto Sans',
