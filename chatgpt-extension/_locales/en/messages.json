@@ -4,5 +4,116 @@
   },
   "extensionDescription": {
     "message": "Bridges the local ChatCMD console to an already signed-in chatgpt.com tab."
+  },
+  "returnToChatCmd": {
+    "message": "Return to ChatCMD"
+  },
+  "clickToReturn": {
+    "message": "Click to return"
+  },
+  "returning": {
+    "message": "Returning…"
+  },
+  "controlledTitle": {
+    "message": "Do not interact with this ChatGPT tab"
+  },
+  "controlledBody": {
+    "message": "This ChatGPT tab is being controlled by ChatCMD. Avoid interacting with it while using ChatCMD because manual changes may disrupt the workflow. Close this tab only after you no longer need it in ChatCMD."
+  },
+  "controlledState": {
+    "message": "ChatCMD is using this tab"
+  },
+  "aiNeedsInfo": {
+    "message": "AI needs more information"
+  },
+  "approvalRequired": {
+    "message": "Approval required"
+  },
+  "planningMode": {
+    "message": "Planning mode"
+  },
+  "globalApproval": {
+    "message": "Global approval"
+  },
+  "planWaiting": {
+    "message": "The AI is waiting for an answer in the current planning turn."
+  },
+  "conversationWaiting": {
+    "message": "A new conversation is waiting for permission to run commands."
+  },
+  "activityWaiting": {
+    "message": "The Agent is waiting for permission to perform an action on your computer."
+  },
+  "waiting": {
+    "message": "waiting"
+  },
+  "task": {
+    "message": "Task"
+  },
+  "tool": {
+    "message": "Tool"
+  },
+  "anotherAnswer": {
+    "message": "Another answer"
+  },
+  "anotherAnswerPlaceholder": {
+    "message": "Enter another suggestion for the AI…"
+  },
+  "rejectionReason": {
+    "message": "Rejection reason (optional)"
+  },
+  "rejectionPlaceholder": {
+    "message": "Example: Do not run this command; use a read-only approach."
+  },
+  "sendAnotherAnswer": {
+    "message": "Send another answer"
+  },
+  "back": {
+    "message": "Back"
+  },
+  "confirmReject": {
+    "message": "Confirm rejection"
+  },
+  "reject": {
+    "message": "Reject"
+  },
+  "allowSimilar": {
+    "message": "Allow similar"
+  },
+  "approve": {
+    "message": "Approve"
+  },
+  "waitingStatus": {
+    "message": "Waiting"
+  },
+  "enterAnswer": {
+    "message": "Enter another answer before sending."
+  },
+  "sendDecisionFailed": {
+    "message": "Could not send the approval decision to ChatCMD."
+  },
+  "approvalDecisionFailed": {
+    "message": "Could not send the approval decision."
+  },
+  "noInput": {
+    "message": "No input data."
+  },
+  "compactTitle": {
+    "message": "ChatGPT is writing the handoff"
+  },
+  "compactPreparing": {
+    "message": "Preparing"
+  },
+  "compactWriting": {
+    "message": "Writing the handoff"
+  },
+  "compactSaving": {
+    "message": "Saving it"
+  },
+  "compactOpening": {
+    "message": "Opening the new chat"
+  },
+  "compactDefaultDetail": {
+    "message": "ChatCMD keeps the conversation and history. You can return later if the tab is closed."
   }
 }
