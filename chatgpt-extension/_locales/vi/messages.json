@@ -1,0 +1,119 @@
+{
+  "extensionName": {
+    "message": "ChatCMD ChatGPT Bridge"
+  },
+  "extensionDescription": {
+    "message": "Kết nối bảng điều khiển ChatCMD cục bộ với tab chatgpt.com đã đăng nhập."
+  },
+  "returnToChatCmd": {
+    "message": "Quay lại ChatCMD"
+  },
+  "clickToReturn": {
+    "message": "Bấm để trở về"
+  },
+  "returning": {
+    "message": "Đang quay lại…"
+  },
+  "controlledTitle": {
+    "message": "Đừng thao tác với tab ChatGPT này"
+  },
+  "controlledBody": {
+    "message": "Tab ChatGPT này đang được xử lý bởi ChatCMD, xin đừng thao tác trên tab trình duyệt này khi bạn vẫn đang sử dụng trên ChatCMD vì có thể gây lỗi cho bên ChatCMD. Chỉ đóng tab này nếu như bạn không còn sử dụng bên ChatCMD nữa."
+  },
+  "controlledState": {
+    "message": "ChatCMD đang sử dụng"
+  },
+  "aiNeedsInfo": {
+    "message": "AI cần thêm thông tin"
+  },
+  "approvalRequired": {
+    "message": "Xin phê duyệt"
+  },
+  "planningMode": {
+    "message": "Planning mode"
+  },
+  "globalApproval": {
+    "message": "Global approval"
+  },
+  "planWaiting": {
+    "message": "AI đang chờ câu trả lời trong lượt lập kế hoạch hiện tại."
+  },
+  "conversationWaiting": {
+    "message": "Một đoạn trò chuyện mới đang chờ quyền chạy lệnh."
+  },
+  "activityWaiting": {
+    "message": "Agent đang chờ quyền thực thi một thao tác trên máy của bạn."
+  },
+  "waiting": {
+    "message": "đang chờ"
+  },
+  "task": {
+    "message": "Task"
+  },
+  "tool": {
+    "message": "Tool"
+  },
+  "anotherAnswer": {
+    "message": "Câu trả lời khác"
+  },
+  "anotherAnswerPlaceholder": {
+    "message": "Nhập đề xuất khác cho AI…"
+  },
+  "rejectionReason": {
+    "message": "Lý do từ chối (không bắt buộc)"
+  },
+  "rejectionPlaceholder": {
+    "message": "Ví dụ: Không chạy lệnh này, hãy dùng cách chỉ đọc."
+  },
+  "sendAnotherAnswer": {
+    "message": "Gửi câu trả lời khác"
+  },
+  "back": {
+    "message": "Quay lại"
+  },
+  "confirmReject": {
+    "message": "Xác nhận từ chối"
+  },
+  "reject": {
+    "message": "Từ chối"
+  },
+  "allowSimilar": {
+    "message": "Cho phép tương tự"
+  },
+  "approve": {
+    "message": "Phê duyệt"
+  },
+  "waitingStatus": {
+    "message": "Đang chờ"
+  },
+  "enterAnswer": {
+    "message": "Nhập câu trả lời khác trước khi gửi."
+  },
+  "sendDecisionFailed": {
+    "message": "Không thể gửi quyết định phê duyệt tới ChatCMD."
+  },
+  "approvalDecisionFailed": {
+    "message": "Không thể gửi quyết định phê duyệt."
+  },
+  "noInput": {
+    "message": "Không có dữ liệu đầu vào."
+  },
+  "compactTitle": {
+    "message": "ChatGPT đang viết bản bàn giao"
+  },
+  "compactPreparing": {
+    "message": "Đang chuẩn bị"
+  },
+  "compactWriting": {
+    "message": "Đang viết bản bàn giao"
+  },
+  "compactSaving": {
+    "message": "Đang lưu"
+  },
+  "compactOpening": {
+    "message": "Đang mở cuộc trò chuyện mới"
+  },
+  "compactDefaultDetail": {
+    "message": "ChatCMD giữ nguyên cuộc trò chuyện và lịch sử. Bạn có thể quay lại sau nếu tab bị đóng."
+  }
+}

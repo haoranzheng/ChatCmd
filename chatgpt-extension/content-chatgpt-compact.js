@@ -1,5 +1,6 @@
 // Compact has its own recorder: only the exact marked public answer can become a handoff.
 (() => {
+  const extTr = (key, fallback) => chrome.i18n?.getMessage?.(key) || fallback;
   globalThis.ChatCmdCompact?.dispose();
   const protocol = globalThis.ChatCmdCompactProtocol;
   const controller = globalThis.ChatCmdController;
@@ -86,7 +87,7 @@
       panel.className = 'chatcmd-compact-panel';
       panel.setAttribute('role', 'status');
       panel.setAttribute('aria-live', 'polite');
-      panel.innerHTML = '<strong>ChatGPT is writing the handoff</strong><ol></ol><p></p>';
+      panel.innerHTML = `<strong>${extTr('compactTitle', 'ChatGPT is writing the handoff')}</strong><ol></ol><p></p>`;
       anchor.before(panel);
     }
     if (!document.getElementById('chatcmd-compact-style')) {
@@ -101,12 +102,13 @@
     const at = protocol.phases.indexOf(job.phase);
     panel.querySelector('ol').replaceChildren(...protocol.steps.map((text, index) => {
       const item = document.createElement('li');
-      item.textContent = `${index < at ? '✓' : index + 1}  ${text}`;
+      const stepKeys = ['compactPreparing', 'compactWriting', 'compactSaving', 'compactOpening'];
+      item.textContent = `${index < at ? '✓' : index + 1}  ${extTr(stepKeys[index], text)}`;
       if (index === at) item.setAttribute('aria-current', 'step');
       item.dataset.done = String(index < at);
       return item;
     }));
-    panel.querySelector('p').textContent = job.detail || 'ChatCMD giữ nguyên cuộc trò chuyện và lịch sử. Bạn có thể quay lại sau nếu tab bị đóng.';
+    panel.querySelector('p').textContent = job.detail || extTr('compactDefaultDetail', 'ChatCMD keeps the conversation and history. You can return later if the tab is closed.');
   }
   function probe(job, kind) {
     if (!isCurrent() || !ownsPage(job, kind)) throw new Error('Cuộc trò chuyện đã thay đổi; không gửi hoặc thu thập nội dung.');

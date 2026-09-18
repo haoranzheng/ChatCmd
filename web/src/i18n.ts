@@ -1,6 +1,7 @@
+import { zhCN } from './i18n.zh-CN';
 import { useSyncExternalStore } from 'react';
 
-export type AppLanguage = 'en' | 'vi';
+export type AppLanguage = 'en' | 'vi' | 'zh-CN';
 export type TranslateParams = Record<string, string | number>;
 
 const PREFERENCES_KEY = 'chatcmd.preferences';
@@ -1026,9 +1027,10 @@ function interpolate(value: string, params?: TranslateParams) {
 }
 
 export function resolveAppLanguage(browserLanguage?: string, stored?: unknown): AppLanguage {
-  if (stored === 'vi' || stored === 'en') return stored;
+  if (stored === 'vi' || stored === 'en' || stored === 'zh-CN') return stored;
   const value = (browserLanguage || '').trim().toLowerCase();
   if (value === 'vi' || value.startsWith('vi-')) return 'vi';
+  if (value === 'zh' || value === 'zh-cn' || value === 'zh-sg' || value.startsWith('zh-hans')) return 'zh-CN';
   if (value === 'en' || value.startsWith('en-')) return 'en';
   return 'en';
 }
@@ -1041,25 +1043,25 @@ function storedLanguage(): AppLanguage | undefined {
   if (typeof localStorage === 'undefined') return undefined;
   try {
     const preferences = JSON.parse(localStorage.getItem(PREFERENCES_KEY) ?? '{}') as { language?: unknown };
-    return preferences.language === 'vi' || preferences.language === 'en' ? preferences.language : undefined;
+    return preferences.language === 'vi' || preferences.language === 'en' || preferences.language === 'zh-CN' ? preferences.language : undefined;
   } catch { return undefined; }
 }
 
 let language: AppLanguage = storedLanguage() ?? detectBrowserLanguage();
 
 export function getAppLanguage() { return language; }
-export function appLocale() { return language === 'vi' ? 'vi-VN' : 'en-US'; }
+export function appLocale() { return language === 'vi' ? 'vi-VN' : language === 'zh-CN' ? 'zh-CN' : 'en-US'; }
 export function hasStoredLanguagePreference() { return storedLanguage() !== undefined; }
 
 export function tr(source: string, params?: TranslateParams) {
-  const translated = language === 'vi' ? vi[source] ?? source : source;
+  const translated = language === 'vi' ? vi[source] ?? source : language === 'zh-CN' ? zhCN[source] ?? source : source;
   return interpolate(translated, params);
 }
 
 export function formatAppNumber(value: number) { return new Intl.NumberFormat(appLocale()).format(value); }
 
 export function setAppLanguage(next: AppLanguage, persist = true) {
-  if (next !== 'en' && next !== 'vi') next = 'en';
+  if (next !== 'en' && next !== 'vi' && next !== 'zh-CN') next = 'en';
   const changed = language !== next;
   language = next;
   if (typeof document !== 'undefined') document.documentElement.lang = next;

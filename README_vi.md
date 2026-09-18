@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  <a href="README.md">English</a> · <strong>Tiếng Việt</strong> · <a href="README_zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   Biến AI chạy trên nền web thành một worker cục bộ thông qua Model Context Protocol.
 </p>
 

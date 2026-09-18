@@ -1,0 +1,119 @@
+{
+  "extensionName": {
+    "message": "ChatCMD ChatGPT 桥接器"
+  },
+  "extensionDescription": {
+    "message": "将本地 ChatCMD 控制台连接到浏览器中已登录的 chatgpt.com 标签页。"
+  },
+  "returnToChatCmd": {
+    "message": "返回 ChatCMD"
+  },
+  "clickToReturn": {
+    "message": "点击返回"
+  },
+  "returning": {
+    "message": "正在返回…"
+  },
+  "controlledTitle": {
+    "message": "请勿操作此 ChatGPT 标签页"
+  },
+  "controlledBody": {
+    "message": "此 ChatGPT 标签页正在由 ChatCMD 控制。仍在 ChatCMD 中使用该任务时，请勿手动操作此标签页，否则可能干扰自动流程。仅在不再使用 ChatCMD 中对应任务时关闭此标签页。"
+  },
+  "controlledState": {
+    "message": "ChatCMD 正在使用"
+  },
+  "aiNeedsInfo": {
+    "message": "AI 需要更多信息"
+  },
+  "approvalRequired": {
+    "message": "需要审批"
+  },
+  "planningMode": {
+    "message": "规划模式"
+  },
+  "globalApproval": {
+    "message": "全局审批"
+  },
+  "planWaiting": {
+    "message": "AI 正在当前规划回合中等待你的回答。"
+  },
+  "conversationWaiting": {
+    "message": "一个新对话正在等待获得命令执行权限。"
+  },
+  "activityWaiting": {
+    "message": "Agent 正在等待执行本机操作的权限。"
+  },
+  "waiting": {
+    "message": "等待中"
+  },
+  "task": {
+    "message": "任务"
+  },
+  "tool": {
+    "message": "工具"
+  },
+  "anotherAnswer": {
+    "message": "其他答案"
+  },
+  "anotherAnswerPlaceholder": {
+    "message": "为 AI 输入其他建议…"
+  },
+  "rejectionReason": {
+    "message": "拒绝原因（可选）"
+  },
+  "rejectionPlaceholder": {
+    "message": "示例：不要运行此命令，请改用只读方式。"
+  },
+  "sendAnotherAnswer": {
+    "message": "发送其他答案"
+  },
+  "back": {
+    "message": "返回"
+  },
+  "confirmReject": {
+    "message": "确认拒绝"
+  },
+  "reject": {
+    "message": "拒绝"
+  },
+  "allowSimilar": {
+    "message": "允许类似操作"
+  },
+  "approve": {
+    "message": "批准"
+  },
+  "waitingStatus": {
+    "message": "等待中"
+  },
+  "enterAnswer": {
+    "message": "发送前请输入其他答案。"
+  },
+  "sendDecisionFailed": {
+    "message": "无法向 ChatCMD 发送审批决定。"
+  },
+  "approvalDecisionFailed": {
+    "message": "无法发送审批决定。"
+  },
+  "noInput": {
+    "message": "没有输入数据。"
+  },
+  "compactTitle": {
+    "message": "ChatGPT 正在编写交接内容"
+  },
+  "compactPreparing": {
+    "message": "正在准备"
+  },
+  "compactWriting": {
+    "message": "正在编写交接内容"
+  },
+  "compactSaving": {
+    "message": "正在保存"
+  },
+  "compactOpening": {
+    "message": "正在打开新对话"
+  },
+  "compactDefaultDetail": {
+    "message": "ChatCMD 会保留当前对话和历史记录。即使标签页被关闭，你之后仍可以返回。"
+  }
+}
