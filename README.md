@@ -7,6 +7,10 @@
 </p>
 
 <p align="center">
+  <strong>English</strong> · <a href="README_vi.md">Tiếng Việt</a> · <a href="README_zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   Turn web-based AI into a local worker through the Model Context Protocol.
 </p>
 
