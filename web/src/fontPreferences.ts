@@ -15,7 +15,7 @@ export const GOOGLE_FONT_PRESETS = [
 ] as const;
 
 const FONT_LINK_ID = 'chatcmd-google-font';
-const SYSTEM_FONT_STACK = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
+const SYSTEM_FONT_STACK = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif';
 const MAX_UPLOADED_FONT_BYTES = 10 * 1024 * 1024;
 let activeUploadedFont: FontFace | null = null;
 
