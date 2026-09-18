@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "ChatCMD ChatGPT Bridge"
+  },
+  "extensionDescription": {
+    "message": "Bridges the local ChatCMD console to an already signed-in chatgpt.com tab."
+  }
+}
