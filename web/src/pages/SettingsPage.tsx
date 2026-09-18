@@ -186,7 +186,7 @@ function FontPicker({ value, source, onChange, onUpload }: { value: string; sour
     try { await onUpload(file); } finally { setUploading(false); }
   };
   return <div className="settings-font-picker">
-    <input list="chatcmd-google-fonts" value={value} onChange={(event) => onChange(event.target.value)} placeholder="Be Vietnam Pro" aria-label={tr('Google Font family')} />
+    <input list="chatcmd-google-fonts" value={value} onChange={(event) => onChange(event.target.value)} placeholder={getAppLanguage() === 'zh-CN' ? 'Noto Sans SC' : 'Be Vietnam Pro'} aria-label={tr('Google Font family')} />
     <datalist id="chatcmd-google-fonts">{GOOGLE_FONT_PRESETS.map((font) => <option key={font} value={font} />)}</datalist>
     <div className="settings-font-presets" aria-label={tr('Recommended Vietnamese fonts')}>{GOOGLE_FONT_PRESETS.map((font) => <button key={font} type="button" className={`settings-font-chip ${source === 'google' && value === font ? 'active' : ''}`} onClick={() => onChange(font)}>{font}</button>)}</div>
     <label className="button secondary settings-font-upload"><Upload />{uploading ? tr('Loading font…') : tr('Upload font')}<input style={{ display: 'none' }} type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" disabled={uploading} onChange={(event) => void chooseFile(event.target.files?.[0])} /></label>
