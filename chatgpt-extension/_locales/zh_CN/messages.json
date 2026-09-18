@@ -1,0 +1,8 @@
+{
+  "extensionName": {
+    "message": "ChatCMD ChatGPT 桥接器"
+  },
+  "extensionDescription": {
+    "message": "将本地 ChatCMD 控制台连接到浏览器中已登录的 chatgpt.com 标签页。"
+  }
+}
