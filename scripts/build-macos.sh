@@ -132,6 +132,7 @@ package_target() {
   chmod +x "$macos/ChatCMD"
   mkdir -p "$output/chatgpt-extension"
   cp -R "$EXTENSION_SOURCE/." "$output/chatgpt-extension/"
+  printf '%s' "$VERSION" > "$output/chatcmd-version.txt"
   create_icns "$resources/ChatCMD.icns"
 
   cat > "$contents/Info.plist" <<EOF

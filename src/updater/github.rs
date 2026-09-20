@@ -4,7 +4,8 @@ use serde::Deserialize;
 
 use super::model::{ReleaseSelection, UpdateAsset, UpdateTarget};
 
-const LATEST_RELEASE_URL: &str = "https://api.github.com/repos/int04/ChatCMD/releases/latest";
+const LATEST_RELEASE_URL: &str =
+    "https://api.github.com/repos/haoranzheng/ChatCmd/releases/latest";
 const GITHUB_ACCEPT: &str = "application/vnd.github+json";
 const GITHUB_API_VERSION: &str = "2022-11-28";
 
