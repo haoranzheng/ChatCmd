@@ -94,6 +94,7 @@ foreach ($entry in $targets) {
 
     Copy-Item $binary (Join-Path $output 'ChatCMD.exe')
     Copy-Item $extensionSource $extensionOutput -Recurse -Force
+    Set-Content -LiteralPath (Join-Path $output 'chatcmd-version.txt') -Value $version -Encoding Ascii -NoNewline
 
     $zip = "$output.zip"
     if (Test-Path $zip) { Remove-Item $zip -Force }
