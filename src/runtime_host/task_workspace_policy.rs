@@ -16,7 +16,7 @@ pub(in crate::runtime_host) fn is_workspace_write_tool(tool: &str) -> bool {
 }
 
 impl RuntimeHost {
-    pub(in crate::runtime_host) async fn require_workspace_access(
+    pub(crate) async fn require_workspace_access(
         &self,
         context: &OperationContext,
         tool: &str,
