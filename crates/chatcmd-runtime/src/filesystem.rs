@@ -39,6 +39,10 @@ pub use file_version::FileVersion;
 pub use repository_index::RepositoryIndex;
 pub use search::SearchProgress;
 
+// Shared by all WorkspaceService clones, including transient MCP scopes.
+// Weak entries avoid retaining mutexes for file paths that are no longer in use.
+type AtomicWriteLocks = std::collections::HashMap<PathBuf, std::sync::Weak<tokio::sync::Mutex<()>>>;
+
 pub trait MutationJournalSink: Send + Sync + std::fmt::Debug {
     fn upsert_json(&self, journal_json: &str) -> RuntimeResult<()>;
     fn remove(&self, operation_id: &str) -> RuntimeResult<()>;
@@ -204,6 +208,7 @@ pub struct WorkspaceService {
     find_states: Arc<find::FindStateStore>,
     search_states: Arc<search::SearchStateStore>,
     version_key: Arc<[u8; 32]>,
+    atomic_write_locks: Arc<std::sync::Mutex<AtomicWriteLocks>>,
     admission: AdmissionController,
     io_resources: IoResourceGovernor,
     repository_index: Arc<RepositoryIndex>,
@@ -239,6 +244,7 @@ impl WorkspaceService {
             find_states: Arc::new(find::FindStateStore::default()),
             search_states: Arc::new(search::SearchStateStore::default()),
             version_key: Arc::new(version_key),
+            atomic_write_locks: Arc::new(std::sync::Mutex::new(AtomicWriteLocks::new())),
             admission: AdmissionController::new(8, 2, 1024 * 1024 * 1024),
             io_resources: IoResourceGovernor::new(256, 4 * 1024 * 1024 * 1024),
             repository_index: Arc::new(RepositoryIndex::default()),
@@ -295,12 +301,26 @@ impl WorkspaceService {
             find_states: self.find_states.clone(),
             search_states: self.search_states.clone(),
             version_key: self.version_key.clone(),
+            atomic_write_locks: self.atomic_write_locks.clone(),
             admission: self.admission.clone(),
             io_resources: self.io_resources.clone(),
             repository_index: self.repository_index.clone(),
             mutation_journal_sink: self.mutation_journal_sink.clone(),
             mutation_fault_injector: self.mutation_fault_injector.clone(),
         })
+    }
+
+    fn atomic_write_lock(&self, path: &Path) -> RuntimeResult<Arc<tokio::sync::Mutex<()>>> {
+        let mut locks = self.atomic_write_locks.lock().map_err(|_| {
+            RuntimeError::new("workspace_lock_unavailable", "Atomic write lock registry is unavailable")
+        })?;
+        locks.retain(|_, weak| weak.strong_count() > 0);
+        if let Some(existing) = locks.get(path).and_then(std::sync::Weak::upgrade) {
+            return Ok(existing);
+        }
+        let lock = Arc::new(tokio::sync::Mutex::new(()));
+        locks.insert(path.to_path_buf(), Arc::downgrade(&lock));
+        Ok(lock)
     }
 
     pub async fn list(
