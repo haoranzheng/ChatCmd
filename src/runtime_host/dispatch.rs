@@ -50,7 +50,7 @@ impl RuntimeHost {
             None
         };
         let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
-        if filesystem_tool || tool == "git_commit" {
+        if filesystem_tool || tool.starts_with("git_") {
             self.require_workspace_access(&context, tool, &arguments).await?;
         }
         let mut task_path_scopes = if writes_workspace {
