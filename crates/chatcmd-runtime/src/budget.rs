@@ -240,7 +240,7 @@ impl BudgetTracker {
         code: &str,
     ) -> RuntimeResult<()> {
         self.checkpoint()?;
-        let updated = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+        let updated = counter.try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
             let next = current.saturating_add(amount);
             limit.is_none_or(|limit| next <= limit).then_some(next)
         });
@@ -278,7 +278,7 @@ impl BudgetTracker {
 }
 
 fn saturating_add(counter: &AtomicU64, amount: u64) {
-    let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+    let _ = counter.try_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
         Some(current.saturating_add(amount))
     });
 }
@@ -341,7 +341,7 @@ impl AdmissionController {
 }
 
 fn reserve_memory(used: &AtomicU64, limit: u64, amount: u64) -> RuntimeResult<()> {
-    used.fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+    used.try_update(Ordering::AcqRel, Ordering::Acquire, |current| {
         current.checked_add(amount).filter(|next| *next <= limit)
     })
     .map(|_| ())
@@ -402,7 +402,7 @@ impl IoResourceGovernor {
 
     pub fn try_reserve_disk(&self, bytes: u64) -> RuntimeResult<DiskReservation> {
         self.disk_reserved
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |current| {
                 current
                     .checked_add(bytes)
                     .filter(|next| *next <= self.disk_limit)
