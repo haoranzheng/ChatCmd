@@ -1,7 +1,7 @@
 import { tr } from './i18n';
 import type { CompactHistory, CompactJob } from './chatgpt/compact/types';
 import type { UpdateStatus } from './updates/types';
-import type { Agent, AgentInput, ChatGptBridge, ChatGptQueuedMessage, ChatGptRequest, CommandExecutionMode, LiveTerminalOutput, LocalSettings, McpStatus, Overview, PlanQuestion, PlanQuestionAnswer, PluginLink, ProblemDetails, SecretResult, Session, SessionDetail, Skill, SkillInstallPreview, SkillInstallResult, SkillOptionValue, Task, TaskActivityDetail, TaskDetail, TaskPage, Tool, ToolPreset, Tunnel, TunnelTestResult, UserSkill, WorkspaceProject } from './types';
+import type { Agent, AgentInput, ChatGptBridge, ChatGptQueuedMessage, ChatGptRequest, CommandExecutionMode, LiveTerminalOutput, LocalSettings, McpStatus, Overview, PlanQuestion, PlanQuestionAnswer, PluginLink, ProblemDetails, SecretResult, Session, SessionDetail, Skill, SkillInstallPreview, SkillInstallResult, SkillOptionValue, Task, TaskActivityDetail, TaskDetail, TaskPage, TaskWorkspaceAccess, WorkspaceAccessMode, Tool, ToolPreset, Tunnel, TunnelTestResult, UserSkill, WorkspaceProject } from './types';
 
 export class ApiError extends Error {
   constructor(message: string, public status?: number, public problem?: ProblemDetails) { super(message); this.name = 'ApiError'; }
@@ -99,6 +99,8 @@ export const api = {
   restartElevated: () => request<ElevationStatus>('/api/local/system/elevation/restart', { method: 'POST', body: '{}' }),
   exitApplication: () => request<{ closing: boolean }>('/api/local/system/exit', { method: 'POST', body: '{}' }),
   workspaceProjects: () => request<WorkspaceProject[]>('/api/local/workspaces/projects'),
+  taskWorkspace: (id: string) => request<TaskWorkspaceAccess>(`/api/local/tasks/${item(id)}/workspace`),
+  setTaskWorkspace: (id: string, input: { projectId: string; accessMode: WorkspaceAccessMode }) => request<TaskWorkspaceAccess>(`/api/local/tasks/${item(id)}/workspace`, { method: 'PUT', body: json(input) }),
   saveWorkspaceProject: (input: { name: string; path: string; chatGptProjectUrl?: string }) => request<WorkspaceProject>('/api/local/workspaces/projects', { method: 'POST', body: json(input) }),
   updateWorkspaceProject: (id: string, input: { name: string; path: string; chatGptProjectUrl?: string }) => request<WorkspaceProject>(`/api/local/workspaces/projects/${item(id)}`, { method: 'PUT', body: json(input) }),
   deleteWorkspaceProject: (id: string) => request<{ deleted: boolean; deletedConversations: number; preservedConversations: number }>(`/api/local/workspaces/projects/${item(id)}`, { method: 'DELETE' }),
