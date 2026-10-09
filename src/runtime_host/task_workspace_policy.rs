@@ -119,9 +119,23 @@ fn resolve_target(root: &Path, raw: &str) -> RuntimeResult<PathBuf> {
 
 fn validate_target_in_root(root: &Path, target: &Path) -> RuntimeResult<()> {
     let mut ancestor = target.to_path_buf();
-    while !ancestor.exists() {
-        if !ancestor.pop() {
-            return Err(outside_scope());
+    loop {
+        // Path::exists follows symlinks and returns false for a dangling link.
+        // That would incorrectly treat a symlink pointing to a not-yet-created
+        // file outside the workspace as an ordinary missing destination.
+        match std::fs::symlink_metadata(&ancestor) {
+            Ok(metadata) => {
+                if metadata.file_type().is_symlink() {
+                    return Err(outside_scope());
+                }
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if !ancestor.pop() {
+                    return Err(outside_scope());
+                }
+            }
+            Err(_) => return Err(outside_scope()),
         }
     }
     let resolved = ancestor.canonicalize().map_err(|_| outside_scope())?;
@@ -152,6 +166,33 @@ mod tests {
         assert_eq!(validate_target_in_root(&root, &b.path().join("other.txt")).unwrap_err().code,
             "path_outside_allowed_scope");
         assert_eq!(mutation_paths("fs_replace_text", &json!({"path":"../outside"}), &root).unwrap_err().code,
+            "path_outside_allowed_scope");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_symlink_pointing_outside_root_is_rejected() {
+        let a = tempfile::tempdir().expect("A");
+        let b = tempfile::tempdir().expect("B");
+        let destination = b.path().join("not-created-yet.txt");
+        let link = a.path().join("external-file");
+        std::os::unix::fs::symlink(&destination, &link).expect("symlink");
+        assert!(!link.exists(), "a dangling symlink must not appear to exist");
+        let root = a.path().canonicalize().expect("root");
+        assert_eq!(validate_target_in_root(&root, &link).unwrap_err().code,
+            "path_outside_allowed_scope");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_directory_symlink_pointing_outside_root_is_rejected() {
+        let a = tempfile::tempdir().expect("A");
+        let b = tempfile::tempdir().expect("B");
+        let directory = b.path().join("not-created-yet");
+        let link = a.path().join("external-dir");
+        std::os::unix::fs::symlink(&directory, &link).expect("symlink");
+        let root = a.path().canonicalize().expect("root");
+        assert_eq!(validate_target_in_root(&root, &link.join("new.txt")).unwrap_err().code,
             "path_outside_allowed_scope");
     }
 
