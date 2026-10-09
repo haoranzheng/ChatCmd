@@ -137,6 +137,13 @@ pub(super) async fn update_workspace_project(
     .map_err(db_problem)?;
 
     if old_canonical != canonical {
+        // Changing project roots must invalidate all previous write decisions.
+        sqlx::query("UPDATE task_workspace_access SET access_mode='restricted',updated_at_ms=? WHERE project_id=?")
+            .bind(now).bind(&id).execute(&mut *transaction).await.map_err(db_problem)?;
+        sqlx::query("UPDATE approvals SET state='cancelled',decision_json=json_object('reason','workspace project root changed'),resolved_at_ms=? WHERE task_id IN (SELECT task_id FROM task_workspace_access WHERE project_id=?) AND state='pending'")
+            .bind(now).bind(&id).execute(&mut *transaction).await.map_err(db_problem)?;
+        sqlx::query("UPDATE approval_grants SET state='revoked',updated_at_ms=? WHERE task_id IN (SELECT task_id FROM task_workspace_access WHERE project_id=?) AND state='active'")
+            .bind(now).bind(&id).execute(&mut *transaction).await.map_err(db_problem)?;
         let task_rows =
             sqlx::query("SELECT id,project_folder FROM tasks WHERE project_folder IS NOT NULL")
                 .fetch_all(&mut *transaction)
@@ -243,6 +250,8 @@ pub(super) async fn delete_workspace_project(
         deleted += 1;
     }
 
+    sqlx::query("DELETE FROM task_workspace_access WHERE project_id=?")
+        .bind(&id).execute(state.repository.pool()).await.map_err(db_problem)?;
     sqlx::query("DELETE FROM workspace_projects WHERE id=?")
         .bind(&id)
         .execute(state.repository.pool())
@@ -367,6 +376,7 @@ fn workspace_project_value(row: &sqlx::sqlite::SqliteRow) -> Value {
         "id": row.get::<String, _>("id"),
         "name": row.get::<String, _>("name"),
         "path": row.get::<String, _>("path"),
+        "pathValid": super::task_workspace::validate_workspace_root(&row.get::<String, _>("path")).is_ok(),
         "chatGptProjectUrl": row.get::<Option<String>, _>("chatgpt_project_url"),
         "createdAtUtc": iso_ms(row.get::<i64, _>("created_at_ms")),
         "updatedAtUtc": iso_ms(row.get::<i64, _>("updated_at_ms"))
