@@ -312,7 +312,10 @@ impl WorkspaceService {
 
     fn atomic_write_lock(&self, path: &Path) -> RuntimeResult<Arc<tokio::sync::Mutex<()>>> {
         let mut locks = self.atomic_write_locks.lock().map_err(|_| {
-            RuntimeError::new("workspace_lock_unavailable", "Atomic write lock registry is unavailable")
+            RuntimeError::new(
+                "workspace_lock_unavailable",
+                "Atomic write lock registry is unavailable",
+            )
         })?;
         locks.retain(|_, weak| weak.strong_count() > 0);
         if let Some(existing) = locks.get(path).and_then(std::sync::Weak::upgrade) {
