@@ -16,7 +16,7 @@ use super::{
     chatgpt_native::*, chatgpt_observation::*, chatgpt_queue::*, chatgpt_result::*, custom_fonts::*, data::*,
     folders::*, overview::*, plan_questions::*, sessions::*, settings::*, skills::*,
     subagent_fallback::*, system::*, task_controls::*, task_delete::*, task_execution_mode::*,
-    task_views::*, tunnels::*, updates::*, workspaces::*,
+    task_views::*, task_workspace::*, tunnels::*, updates::*, workspaces::*,
 };
 
 pub(crate) fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
@@ -136,6 +136,7 @@ pub(crate) fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/tasks/{id}", get(task).delete(delete_task))
         .route("/tasks/{id}/activities/{activity_id}", get(task_activity))
         .route("/tasks/{id}/title", axum::routing::put(set_task_title))
+        .route("/tasks/{id}/workspace", get(task_workspace).put(set_task_workspace))
         .route(
             "/tasks/{id}/command-execution-mode",
             get(task_execution_mode).put(set_task_execution_mode),
