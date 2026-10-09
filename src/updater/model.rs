@@ -103,11 +103,11 @@ impl UpdateTarget {
         let architecture = std::env::consts::ARCH;
         #[cfg(target_os = "windows")]
         {
-            return Self {
+            Self {
                 platform: "windows",
                 architecture,
                 supported: matches!(architecture, "x86_64" | "x86"),
-            };
+            }
         }
         #[cfg(target_os = "macos")]
         {
