@@ -27,7 +27,7 @@ impl RuntimeHost {
                 "A task identity is required to access a workspace.")
         })?;
         let row = sqlx::query(
-            "SELECT a.access_mode,a.project_id,t.project_folder,p.path AS project_path FROM task_workspace_access a JOIN tasks t ON t.id=a.task_id JOIN workspace_projects p ON p.id=a.project_id WHERE a.task_id=?"
+            "SELECT a.access_mode,a.project_id,t.project_folder,p.path AS project_path FROM task_workspace_access a JOIN tasks t ON t.id=a.task_id LEFT JOIN workspace_projects p ON p.id=a.project_id WHERE a.task_id=?"
         ).bind(task_id).fetch_optional(self.repository.pool()).await
             .map_err(|_| RuntimeError::new("storage_error", "workspace authorization lookup failed"))?;
 
@@ -53,7 +53,7 @@ impl RuntimeHost {
         }
         let bound = row.get::<Option<String>, _>("project_folder")
             .ok_or_else(|| RuntimeError::new("project_folder_required", "Task workspace must be bound locally."))?;
-        if std::fs::canonicalize(&bound).ok().as_deref() != Some(root.as_path()) {
+        if root != PathBuf::from(&bound) || std::fs::canonicalize(&bound).ok().as_deref() != Some(root.as_path()) {
             return Err(RuntimeError::new("approval_scope_invalid",
                 "The task project changed since authorization. Rebind it in the local UI."));
         }
