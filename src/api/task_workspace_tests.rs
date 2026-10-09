@@ -288,6 +288,25 @@ async fn removing_a_saved_project_keeps_a_restrictive_tombstone() {
         .await
         .expect("agent");
     bind(state.clone(), &task, &project_id, "readWrite").await;
+
+    // An unrelated project's pending approval must not be cancelled merely
+    // because a different project was deleted (previous null-project query
+    // revoked every existing tombstone).
+    let other = tempfile::tempdir().expect("unrelated project");
+    let unrelated_id = "unrelated-workspace";
+    let unrelated_task = "unrelated-task";
+    let other_path = other.path().canonicalize().expect("unrelated root");
+    sqlx::query("INSERT INTO workspace_projects(id,name,path,canonical_path,created_at_ms,updated_at_ms) VALUES(?,?,?, ?,0,0)")
+        .bind(unrelated_id).bind("Unrelated").bind(other_path.to_string_lossy().as_ref())
+        .bind(other_path.to_string_lossy().as_ref())
+        .execute(state.repository.pool()).await.expect("unrelated project");
+    sqlx::query("INSERT INTO tasks(id,agent_id,device_id,title,source,status,generation,created_at_ms,updated_at_ms) VALUES(?,?,?,'Unrelated task','mcp','running',1,0,0)")
+        .bind(unrelated_task).bind(&agent).bind(state.device.id.as_str())
+        .execute(state.repository.pool()).await.expect("unrelated task");
+    bind(state.clone(), unrelated_task, unrelated_id, "readWrite").await;
+    sqlx::query("INSERT INTO approvals(id,task_id,session_id,state,request_json,decision_json,created_at_ms,resolved_at_ms) VALUES('unrelated-approval',?,NULL,'pending','{}',NULL,0,NULL)")
+        .bind(unrelated_task).execute(state.repository.pool()).await.expect("pending unrelated approval");
+
     crate::api::workspaces::delete_workspace_project(State(state.clone()), AxumPath(project_id))
         .await
         .expect("delete saved project");
@@ -296,6 +315,9 @@ async fn removing_a_saved_project_keeps_a_restrictive_tombstone() {
         .expect("tombstone");
     assert_eq!(row.0["accessMode"], "restricted");
     assert!(row.0["projectId"].is_null());
+    let pending: String = sqlx::query_scalar("SELECT state FROM approvals WHERE id='unrelated-approval'")
+        .fetch_one(host.repository.pool()).await.expect("unrelated approval retained");
+    assert_eq!(pending, "pending");
     let error = host
         .require_workspace_access(
             &context(&task, &agent, "fs_read_text", "tombstone-read"),
