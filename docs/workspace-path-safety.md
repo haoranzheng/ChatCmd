@@ -1,5 +1,9 @@
 # Workspace path safety and traversal policy
 
+Managed writes and `git_commit` now require an explicit, authenticated local task-to-Workspace-Project authorization (`task_workspace_access` with `readWrite`). Paths in messages or tool arguments never mint write authority. Each mutation target must remain inside the currently persisted project root, and authorization is rechecked before dispatch after approval. Project edits invalidate previously granted write authority. See [local authorization steps](workspace-write-authorization.md).
+
+The legacy user-message absolute-path read policy is retained, but file tool arguments no longer create additional filesystem path scopes. CLI/shell processes are not OS filesystem sandboxes; approvals alone cannot confine the filesystem effects of arbitrary commands.
+
 Filesystem requests are authorized after canonicalization. An absolute path is not an implicit
 grant: it must be inside a configured workspace root or an explicit path scope derived from the
 current task's user message. A file scope grants only that file; a directory scope grants its
