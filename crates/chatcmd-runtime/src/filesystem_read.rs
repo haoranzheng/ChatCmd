@@ -31,7 +31,7 @@ struct FileIdentity {
 }
 
 impl FileIdentity {
-    fn from_metadata(metadata: &std::fs::Metadata, path: &Path) -> RuntimeResult<Self> {
+    fn from_metadata(metadata: &std::fs::Metadata, _path: &Path) -> RuntimeResult<Self> {
         #[cfg(unix)]
         use std::os::unix::fs::MetadataExt as _;
         Ok(Self {
@@ -43,7 +43,7 @@ impl FileIdentity {
                 .unwrap_or(Duration::ZERO)
                 .as_nanos(),
             #[cfg(windows)]
-            volume_and_index: super::file_version::windows_file_identity(path)?,
+            volume_and_index: super::file_version::windows_file_identity(_path)?,
             #[cfg(unix)]
             device: metadata.dev(),
             #[cfg(unix)]
