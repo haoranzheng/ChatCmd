@@ -47,11 +47,12 @@ export function UpdateSettings() {
     return () => { cancelled = true; };
   }, [check]);
 
+  const phase = status?.phase;
   useEffect(() => {
-    if (!status || !isActiveUpdatePhase(status.phase) || status.phase === 'restarting') return;
+    if (!phase || !isActiveUpdatePhase(phase) || phase === 'restarting') return;
     const timer = window.setInterval(() => { void refreshStatus(); }, 450);
     return () => window.clearInterval(timer);
-  }, [refreshStatus, status?.phase]);
+  }, [refreshStatus, phase]);
 
   const restart = useCallback(async (targetVersion: string) => {
     if (restartInFlight.current) return;
