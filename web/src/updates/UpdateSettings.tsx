@@ -12,7 +12,7 @@ export function UpdateSettings() {
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [restarting, setRestarting] = useState(false);
-  const autoRestart = useRef(false);
+  const [autoRestart, setAutoRestart] = useState(false);
   const restartInFlight = useRef(false);
 
   const refreshStatus = useCallback(async () => {
@@ -70,18 +70,18 @@ export function UpdateSettings() {
   }, []);
 
   useEffect(() => {
-    if (status?.phase !== 'readyToRestart' || !status.latestVersion || !autoRestart.current) return;
+    if (status?.phase !== 'readyToRestart' || !status.latestVersion || !autoRestart) return;
     void restart(status.latestVersion);
-  }, [restart, status?.latestVersion, status?.phase]);
+  }, [autoRestart, restart, status?.latestVersion, status?.phase]);
 
   const beginUpdate = async () => {
     setConfirming(false);
     setError('');
-    autoRestart.current = true;
+    setAutoRestart(true);
     try {
       setStatus(await api.startUpdate());
     } catch (reason) {
-      autoRestart.current = false;
+      setAutoRestart(false);
       setError(errorMessage(reason));
     }
   };
