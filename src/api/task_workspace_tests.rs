@@ -23,7 +23,7 @@ async fn fixture(project: &Path) -> (RuntimeHost, Arc<AppState>, String, String,
 }
 
 async fn bind(state: Arc<AppState>, task: &str, project: &str, mode: &str) {
-    set_task_workspace(State(state), AxumPath(task.to_owned()), Json(TaskWorkspaceChange {
+    let _ = set_task_workspace(State(state), AxumPath(task.to_owned()), Json(TaskWorkspaceChange {
         project_id: project.to_owned(), access_mode: mode.to_owned()
     })).await.expect("bind through local UI handler");
 }
