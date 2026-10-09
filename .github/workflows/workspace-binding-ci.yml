@@ -27,7 +27,6 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo fmt --all -- --check
-        continue-on-error: true # Existing formatting debt; report failure but run compilation/test checks
       - run: cargo check --workspace --all-targets
       - uses: actions/setup-node@v4
         with:
@@ -75,6 +74,5 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run lint
-        continue-on-error: true # Existing UpdateSettings lint debt; still run tests/build
       - run: npm test -- --run
       - run: npm run build
