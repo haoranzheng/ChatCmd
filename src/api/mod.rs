@@ -45,7 +45,7 @@ mod task_controls;
 mod task_delete;
 mod task_execution_mode;
 pub(crate) mod task_workspace;
-mod task_views;
+pub(crate) mod task_views;
 mod tunnels;
 mod updates;
 mod workspaces;
