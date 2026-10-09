@@ -41,7 +41,9 @@ jobs:
         run: |
           npm run build --prefix web
           if ($LASTEXITCODE -ne 0) { throw 'Frontend production build failed' }
-          $env:CHATCMD_BUILD_VERSION = "workspace-preview-${{ github.sha }}"
+          $stamp = (Get-Date).ToUniversalTime().ToString('yy.MM.dd.HHmm')
+          $shortSha = ('${{ github.sha }}').Substring(0, 8)
+          $env:CHATCMD_BUILD_VERSION = "$stamp-preview-$shortSha"
           cargo build --release --features embedded-web --target x86_64-pc-windows-msvc
           if ($LASTEXITCODE -ne 0) { throw 'Windows x64 release build failed' }
           New-Item -ItemType Directory -Path staging -Force | Out-Null
