@@ -130,7 +130,7 @@ export function UpdateSettings() {
         <div className="update-settings-primary-actions">
           {status.updateAvailable && status.downloadAvailable && !busy && status.phase !== 'readyToRestart' &&
             <button type="button" className="button primary update-settings-cta" onClick={() => setConfirming(true)}><Download />{copy.update}</button>}
-          {status.phase === 'readyToRestart' && !autoRestart.current &&
+          {status.phase === 'readyToRestart' && !autoRestart &&
             <button type="button" className="button primary update-settings-cta" disabled={restarting} onClick={() => status.latestVersion && void restart(status.latestVersion)}>
               <RotateCcw className={restarting ? 'spin' : ''} />{restarting ? copy.restarting : copy.restart}
             </button>}
