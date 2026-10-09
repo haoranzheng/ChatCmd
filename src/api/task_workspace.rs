@@ -2,15 +2,19 @@
 //! An MCP caller cannot mint or broaden this authority.
 use std::path::{Path as FsPath, PathBuf};
 
-use axum::{Json, extract::{Path, State}, http::StatusCode};
+use axum::{
+    Json,
+    extract::{Path, State},
+    http::StatusCode,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use sqlx::Row;
-use uuid::Uuid;
 use std::sync::Arc;
+use uuid::Uuid;
 
-use crate::websocket::{AppEvent, AppState};
 use super::{Problem, db_problem, now_ms};
+use crate::websocket::{AppEvent, AppState};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,11 +28,17 @@ pub(super) async fn task_workspace(
     Path(id): Path<String>,
 ) -> Result<Json<Value>, Problem> {
     let task = sqlx::query("SELECT project_folder FROM tasks WHERE id=?")
-        .bind(&id).fetch_optional(state.repository.pool()).await.map_err(db_problem)?
+        .bind(&id)
+        .fetch_optional(state.repository.pool())
+        .await
+        .map_err(db_problem)?
         .ok_or_else(missing_task)?;
-    let binding = sqlx::query(
-        "SELECT project_id,access_mode FROM task_workspace_access WHERE task_id=?"
-    ).bind(&id).fetch_optional(state.repository.pool()).await.map_err(db_problem)?;
+    let binding =
+        sqlx::query("SELECT project_id,access_mode FROM task_workspace_access WHERE task_id=?")
+            .bind(&id)
+            .fetch_optional(state.repository.pool())
+            .await
+            .map_err(db_problem)?;
     Ok(Json(json!({
         "taskId": id,
         "projectFolder": task.get::<Option<String>, _>("project_folder"),
@@ -43,14 +53,28 @@ pub(super) async fn set_task_workspace(
     Path(id): Path<String>,
     Json(change): Json<TaskWorkspaceChange>,
 ) -> Result<Json<Value>, Problem> {
-    if !matches!(change.access_mode.as_str(), "restricted" | "readOnly" | "readWrite") {
-        return Err(Problem::new(StatusCode::BAD_REQUEST, "Invalid workspace access mode",
-            "Choose restricted, readOnly, or readWrite."));
+    if !matches!(
+        change.access_mode.as_str(),
+        "restricted" | "readOnly" | "readWrite"
+    ) {
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid workspace access mode",
+            "Choose restricted, readOnly, or readWrite.",
+        ));
     }
     let row = sqlx::query("SELECT path FROM workspace_projects WHERE id=?")
-        .bind(&change.project_id).fetch_optional(state.repository.pool()).await.map_err(db_problem)?
-        .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "Workspace project not found",
-            "Create or select a saved workspace project in the local management UI."))?;
+        .bind(&change.project_id)
+        .fetch_optional(state.repository.pool())
+        .await
+        .map_err(db_problem)?
+        .ok_or_else(|| {
+            Problem::new(
+                StatusCode::NOT_FOUND,
+                "Workspace project not found",
+                "Create or select a saved workspace project in the local management UI.",
+            )
+        })?;
     let canonical = validate_workspace_root(row.get::<&str, _>("path"))?;
     let folder = canonical.to_string_lossy().into_owned();
     let now = now_ms();
@@ -59,9 +83,16 @@ pub(super) async fn set_task_workspace(
     // This endpoint is not exposed to MCP/extension callers. Never resolve project IDs from
     // tool arguments or a message's absolute-path text.
     let updated = sqlx::query("UPDATE tasks SET project_folder=?,updated_at_ms=? WHERE id=?")
-        .bind(&folder).bind(now).bind(&id)
-        .execute(&mut *tx).await.map_err(db_problem)?.rows_affected();
-    if updated != 1 { return Err(missing_task()); }
+        .bind(&folder)
+        .bind(now)
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_problem)?
+        .rows_affected();
+    if updated != 1 {
+        return Err(missing_task());
+    }
     sqlx::query("INSERT INTO task_workspace_access(task_id,project_id,access_mode,updated_at_ms) VALUES(?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET project_id=excluded.project_id,access_mode=excluded.access_mode,updated_at_ms=excluded.updated_at_ms")
         .bind(&id).bind(&change.project_id).bind(&change.access_mode).bind(now)
         .execute(&mut *tx).await.map_err(db_problem)?;
@@ -82,19 +113,28 @@ pub(super) async fn set_task_workspace(
     let mut event = AppEvent::new("workspace.access_changed", payload);
     event.task_id = Some(id.clone());
     state.publish(event);
-    Ok(Json(json!({"taskId":id,"projectId":change.project_id,"projectFolder":folder,
-        "accessMode":change.access_mode,"locallyAuthorized":true})))
+    Ok(Json(
+        json!({"taskId":id,"projectId":change.project_id,"projectFolder":folder,
+        "accessMode":change.access_mode,"locallyAuthorized":true}),
+    ))
 }
 
 fn missing_task() -> Problem {
-    Problem::new(StatusCode::NOT_FOUND, "Task not found", "The task no longer exists.")
+    Problem::new(
+        StatusCode::NOT_FOUND,
+        "Task not found",
+        "The task no longer exists.",
+    )
 }
 
 pub(super) fn validate_workspace_root(value: &str) -> Result<PathBuf, Problem> {
     let requested = FsPath::new(value);
     if !requested.is_absolute() {
-        return Err(Problem::new(StatusCode::BAD_REQUEST, "Invalid workspace path",
-            "The project path must be an existing absolute directory."));
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid workspace path",
+            "The project path must be an existing absolute directory.",
+        ));
     }
     // Reject junctions/reparse components, including an intermediate parent.
     // On Windows a drive/UNC Prefix (e.g. `C:` or `\\server\share`)
@@ -104,29 +144,44 @@ pub(super) fn validate_workspace_root(value: &str) -> Result<PathBuf, Problem> {
     let mut component_path = PathBuf::new();
     for part in requested.components() {
         if matches!(part, std::path::Component::ParentDir) {
-            return Err(Problem::new(StatusCode::BAD_REQUEST, "Invalid workspace path",
-                "The project path must not contain parent-directory traversal."));
+            return Err(Problem::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid workspace path",
+                "The project path must not contain parent-directory traversal.",
+            ));
         }
         component_path.push(part.as_os_str());
         if matches!(part, std::path::Component::Prefix(_)) {
             continue;
         }
         let meta = std::fs::symlink_metadata(&component_path).map_err(|_| {
-            Problem::new(StatusCode::BAD_REQUEST, "Workspace path unavailable",
-                "The selected project directory does not exist or is inaccessible.")
+            Problem::new(
+                StatusCode::BAD_REQUEST,
+                "Workspace path unavailable",
+                "The selected project directory does not exist or is inaccessible.",
+            )
         })?;
         if meta.file_type().is_symlink() || is_windows_reparse_point(&meta) {
-            return Err(Problem::new(StatusCode::BAD_REQUEST, "Workspace reparse point rejected",
-                "Select a directory without symlinks, junctions or reparse-point components."));
+            return Err(Problem::new(
+                StatusCode::BAD_REQUEST,
+                "Workspace reparse point rejected",
+                "Select a directory without symlinks, junctions or reparse-point components.",
+            ));
         }
     }
     let canonical = std::fs::canonicalize(requested).map_err(|_| {
-        Problem::new(StatusCode::BAD_REQUEST, "Workspace path unavailable",
-            "The selected directory could not be resolved.")
+        Problem::new(
+            StatusCode::BAD_REQUEST,
+            "Workspace path unavailable",
+            "The selected directory could not be resolved.",
+        )
     })?;
     if !canonical.is_dir() || canonical.parent().is_none() {
-        return Err(Problem::new(StatusCode::BAD_REQUEST, "Invalid workspace root",
-            "Select an existing project directory, not a filesystem root."));
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "Invalid workspace root",
+            "Select an existing project directory, not a filesystem root.",
+        ));
     }
     Ok(canonical)
 }
@@ -138,7 +193,9 @@ fn is_windows_reparse_point(meta: &std::fs::Metadata) -> bool {
 }
 
 #[cfg(not(windows))]
-fn is_windows_reparse_point(_: &std::fs::Metadata) -> bool { false }
+fn is_windows_reparse_point(_: &std::fs::Metadata) -> bool {
+    false
+}
 
 #[cfg(test)]
 mod tests {
@@ -149,7 +206,9 @@ mod tests {
         let temp = tempfile::tempdir().expect("temp workspace");
         assert!(validate_workspace_root(temp.path().to_str().expect("utf8")).is_ok());
         assert!(validate_workspace_root("not-a-workspace").is_err());
-        assert!(validate_workspace_root(temp.path().join("missing").to_str().expect("utf8")).is_err());
+        assert!(
+            validate_workspace_root(temp.path().join("missing").to_str().expect("utf8")).is_err()
+        );
     }
 
     #[cfg(unix)]
