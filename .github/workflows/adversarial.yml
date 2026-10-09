@@ -29,6 +29,8 @@ jobs:
           node-version: '22'
       - run: npm ci --prefix web
       - run: cargo test --workspace --no-fail-fast
+        env:
+          RUST_TEST_THREADS: '2'
 
   tier-1-platform:
     name: Tier 1 / ${{ matrix.os }}
