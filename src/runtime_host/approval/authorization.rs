@@ -5,7 +5,7 @@ impl RuntimeHost {
         tool: &str,
         arguments: &Value,
     ) -> RuntimeResult<()> {
-        if tool.starts_with("fs_") || matches!(tool, "workspace_index_status" | "workspace_index_rebuild" | "git_commit") {
+        if tool.starts_with("fs_") || tool.starts_with("git_") || matches!(tool, "workspace_index_status" | "workspace_index_rebuild") {
             self.require_workspace_access(context, tool, arguments).await?;
         }
         let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
