@@ -7,3 +7,4 @@ CREATE TABLE task_workspace_access (
 );
 CREATE INDEX idx_task_workspace_access_project ON task_workspace_access(project_id);
 UPDATE schema_version SET version = 26 WHERE singleton_id = 1;
+UPDATE app_metadata SET value = '26' WHERE key = 'schema_version';
