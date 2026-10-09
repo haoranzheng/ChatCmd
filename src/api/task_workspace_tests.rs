@@ -315,8 +315,11 @@ async fn removing_a_saved_project_keeps_a_restrictive_tombstone() {
         .expect("tombstone");
     assert_eq!(row.0["accessMode"], "restricted");
     assert!(row.0["projectId"].is_null());
-    let pending: String = sqlx::query_scalar("SELECT state FROM approvals WHERE id='unrelated-approval'")
-        .fetch_one(host.repository.pool()).await.expect("unrelated approval retained");
+    let pending: String =
+        sqlx::query_scalar("SELECT state FROM approvals WHERE id='unrelated-approval'")
+            .fetch_one(host.repository.pool())
+            .await
+            .expect("unrelated approval retained");
     assert_eq!(pending, "pending");
     let error = host
         .require_workspace_access(
