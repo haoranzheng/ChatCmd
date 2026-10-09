@@ -5,6 +5,10 @@ impl RuntimeHost {
         tool: &str,
         arguments: &Value,
     ) -> RuntimeResult<()> {
+        if tool.starts_with("fs_") || matches!(tool, "workspace_index_status" | "workspace_index_rebuild" | "git_commit") {
+            self.require_workspace_access(context, tool, arguments).await?;
+        }
+        let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
         let capabilities = tool_capabilities(tool);
         if capabilities.is_permission_change() {
             return Err(RuntimeError::new(
@@ -24,7 +28,8 @@ impl RuntimeHost {
             .await
             .map_err(storage_error)?
         {
-            chatcmd_core::ExecutionMode::Allow => return Ok(()),
+            chatcmd_core::ExecutionMode::Allow if !writes_workspace => return Ok(()),
+            chatcmd_core::ExecutionMode::Allow => {},
             chatcmd_core::ExecutionMode::Deny => {
                 return Err(RuntimeError::new(
                     "policy_denied",
