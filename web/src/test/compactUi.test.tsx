@@ -69,8 +69,8 @@ describe('Compact & Resume task UI', () => {
     const trigger = screen.getByRole('button', { name: tr('Compact & resume now') });
     trigger.focus(); fireEvent.click(trigger);
     const dialog = screen.getByRole('dialog', { name: tr('Compact & resume now') });
-    expect(dialog).toHaveAccessibleDescription(compactConfirmation);
-    expect(within(dialog).getByText(compactConfirmation)).toBeVisible();
+    expect(dialog).toHaveAccessibleDescription(tr(compactConfirmation));
+    expect(within(dialog).getByText(tr(compactConfirmation))).toBeVisible();
     expect(dialog).toHaveAttribute('aria-modal', 'true');
     expect(api.startChatGptCompact).not.toHaveBeenCalled();
     expect(resumeChatGptCompact).not.toHaveBeenCalled();
@@ -97,7 +97,7 @@ describe('Compact & Resume task UI', () => {
     expect(view.container.contains(backdrop)).toBe(false);
     expect(footer.contains(dialog)).toBe(false);
     expect(dialog.closest('form')).toBeNull();
-    expect(dialog).toHaveAccessibleDescription(compactConfirmation);
+    expect(dialog).toHaveAccessibleDescription(tr(compactConfirmation));
     const checkbox = within(dialog).getByRole('checkbox', { name: compactText('continueAfterCompact') });
     expect(checkbox).not.toBeChecked();
     fireEvent.mouseDown(checkbox); fireEvent.click(checkbox);
@@ -150,9 +150,9 @@ describe('Compact & Resume task UI', () => {
     const heading = screen.getByRole('heading', { name: tr('ChatGPT is writing the handoff') });
     expect(heading.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(currentSteps()).toHaveLength(4);
-    compactSteps.forEach((step, index) => expect(currentSteps()[index]).toHaveTextContent(step.label));
+    compactSteps.forEach((step, index) => expect(currentSteps()[index]).toHaveTextContent(tr(step.label)));
     expect(currentSteps()[0]).toHaveAttribute('aria-current', 'step');
-    expect(screen.getByRole('region', { name: 'Compact & resume progress' }).querySelector('[aria-live="polite"]')).not.toBeNull();
+    expect(screen.getByRole('region', { name: tr('Compact & resume progress') }).querySelector('[aria-live="polite"]')).not.toBeNull();
     for (const name of [tr('Compact & resume now'), tr('Send'), tr('Close this tab'), tr('Change model'), tr('Queue another message'), tr('Send immediate message')]) {
       expect(screen.getByRole('button', { name })).toBeDisabled();
     }
@@ -179,7 +179,7 @@ describe('Compact & Resume task UI', () => {
     expect(screen.getByTestId('route')).toHaveTextContent(`/tasks/${compactTaskId}`);
     expect(screen.getByRole('link', { name: tr('Open original conversation') })).toHaveAttribute('href', newUrl);
     expect(screen.queryByRole('heading', { name: tr('ChatGPT is writing the handoff') })).not.toBeInTheDocument();
-    expect(screen.queryByRole('region', { name: 'Compact & resume progress' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: tr('Compact & resume progress') })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: tr('Send') })); await flush();
     expect(api.sendChatGptMessage).toHaveBeenCalledExactlyOnceWith(compactTaskId, { model: 'Auto', content: 'My preserved draft' });
     expect(dispatchChatGptRequest).toHaveBeenCalledWith(expect.objectContaining({ requestId: 'next-request', conversationUrl: newUrl }));
@@ -274,7 +274,7 @@ describe('Compact & Resume task UI', () => {
     expect(screen.getByRole('button', { name: tr('Send') })).toBeDisabled();
     expect(screen.getAllByText(/offline/).length).toBeGreaterThan(0);
     vi.mocked(api.chatGptCompact).mockResolvedValue({ active: null, history: [] });
-    fireEvent.click(within(screen.getByRole('region', { name: 'Compact & resume error' })).getByRole('button', { name: tr('Retry') }));
+    fireEvent.click(within(screen.getByRole('region', { name: tr('Compact & resume error') })).getByRole('button', { name: tr('Retry') }));
     await flush();
     expect(screen.getByRole('button', { name: tr('Compact & resume now') })).toBeEnabled();
   });
@@ -284,7 +284,7 @@ describe('Compact & Resume task UI', () => {
     vi.mocked(api.chatGptCompact).mockResolvedValue({ active: ['completed', 'cancelled'].includes(phase) ? null : job, history: [job] });
     render(<CompactProvider taskId={compactTaskId}><CompactStatusCard /></CompactProvider>); await flush();
     if (phase === 'completed' || phase === 'cancelled') {
-      expect(screen.queryByRole('region', { name: 'Compact & resume progress' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('region', { name: tr('Compact & resume progress') })).not.toBeInTheDocument();
       expect(screen.queryByText(tr('ChatGPT is writing the handoff'))).not.toBeInTheDocument();
       return;
     }
