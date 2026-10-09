@@ -97,9 +97,20 @@ pub(super) fn validate_workspace_root(value: &str) -> Result<PathBuf, Problem> {
             "The project path must be an existing absolute directory."));
     }
     // Reject junctions/reparse components, including an intermediate parent.
+    // On Windows a drive/UNC Prefix (e.g. `C:` or `\\server\share`)
+    // is not a standalone filesystem path: `symlink_metadata("C:")`
+    // inspects the drive's *current directory* instead of `C:\`.
+    // Append the RootDir before inspecting the first real component.
     let mut component_path = PathBuf::new();
     for part in requested.components() {
+        if matches!(part, std::path::Component::ParentDir) {
+            return Err(Problem::new(StatusCode::BAD_REQUEST, "Invalid workspace path",
+                "The project path must not contain parent-directory traversal."));
+        }
         component_path.push(part.as_os_str());
+        if matches!(part, std::path::Component::Prefix(_)) {
+            continue;
+        }
         let meta = std::fs::symlink_metadata(&component_path).map_err(|_| {
             Problem::new(StatusCode::BAD_REQUEST, "Workspace path unavailable",
                 "The selected project directory does not exist or is inaccessible.")
