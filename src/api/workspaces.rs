@@ -140,9 +140,9 @@ pub(super) async fn update_workspace_project(
         // Changing project roots must invalidate all previous write decisions.
         // Preserve a content-free audit record for each authorization invalidated by this edit.
         sqlx::query("INSERT INTO timeline_events(event_id,task_id,turn_id,session_id,actor,kind,idempotency_key,payload_json,metadata_json,created_at_ms) SELECT lower(hex(randomblob(16))),task_id,NULL,NULL,'user','status',lower(hex(randomblob(16))),json_object('source','authenticatedLocalUi','change','workspaceAccessRevoked','projectId',?,'reason','project_root_changed'),NULL,? FROM task_workspace_access WHERE project_id=?")
-            .bind(&id).bind(&id).bind(now).execute(&mut *transaction).await.map_err(db_problem)?;
+            .bind(&id).bind(now).bind(&id).execute(&mut *transaction).await.map_err(db_problem)?;
         sqlx::query("UPDATE task_workspace_access SET access_mode='restricted',updated_at_ms=? WHERE project_id=?")
-            .bind(&id).bind(now).execute(&mut *transaction).await.map_err(db_problem)?;
+            .bind(now).bind(&id).execute(&mut *transaction).await.map_err(db_problem)?;
         sqlx::query("WITH RECURSIVE affected(id) AS (SELECT task_id FROM task_workspace_access WHERE project_id=? UNION SELECT child_task_id FROM subagent_runs JOIN affected ON parent_task_id=affected.id WHERE child_task_id IS NOT NULL) UPDATE approvals SET state='cancelled',decision_json=json_object('reason','workspace project root changed'),resolved_at_ms=? WHERE task_id IN (SELECT id FROM affected) AND state='pending'")
             .bind(&id).bind(now).execute(&mut *transaction).await.map_err(db_problem)?;
         sqlx::query("WITH RECURSIVE affected(id) AS (SELECT task_id FROM task_workspace_access WHERE project_id=? UNION SELECT child_task_id FROM subagent_runs JOIN affected ON parent_task_id=affected.id WHERE child_task_id IS NOT NULL) UPDATE approval_grants SET state='revoked',updated_at_ms=? WHERE task_id IN (SELECT id FROM affected) AND state='active'")
