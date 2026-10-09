@@ -73,7 +73,7 @@ impl RuntimeHost {
         } else {
             arguments
         };
-        if (filesystem_tool || tool.starts_with("git_")) && !writes_workspace {
+        if tool.starts_with("git_") && !writes_workspace {
             task_path_scopes.extend(path_scopes::argument_path_scopes(&arguments));
             task_path_scopes.sort();
             task_path_scopes.dedup();
