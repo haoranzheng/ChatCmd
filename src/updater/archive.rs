@@ -111,7 +111,6 @@ where
         reject_symlink(entry.unix_mode())?;
         let relative = entry
             .enclosed_name()
-            .map(PathBuf::from)
             .ok_or_else(|| anyhow!("update zip contains an unsafe path"))?;
         let output = destination.join(relative);
         if entry.is_dir() {

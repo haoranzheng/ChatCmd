@@ -307,7 +307,7 @@ async fn removing_a_saved_project_keeps_a_restrictive_tombstone() {
     sqlx::query("INSERT INTO approvals(id,task_id,session_id,state,request_json,decision_json,created_at_ms,resolved_at_ms) VALUES('unrelated-approval',?,NULL,'pending','{}',NULL,0,NULL)")
         .bind(unrelated_task).execute(state.repository.pool()).await.expect("pending unrelated approval");
 
-    crate::api::workspaces::delete_workspace_project(State(state.clone()), AxumPath(project_id))
+    let _ = crate::api::workspaces::delete_workspace_project(State(state.clone()), AxumPath(project_id))
         .await
         .expect("delete saved project");
     let row = task_workspace(State(state.clone()), AxumPath(task.clone()))

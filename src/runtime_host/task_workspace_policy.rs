@@ -97,7 +97,7 @@ impl RuntimeHost {
                     "Task workspace must be bound locally.",
                 )
             })?;
-        if root != PathBuf::from(&bound)
+        if root.as_path() != Path::new(&bound)
             || std::fs::canonicalize(&bound).ok().as_deref() != Some(root.as_path())
         {
             return Err(RuntimeError::new(
