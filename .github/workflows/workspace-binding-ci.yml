@@ -17,7 +17,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 55
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -34,6 +34,29 @@ jobs:
       - run: cargo build --bin chat-cmd-client
         if: runner.os == 'Windows'
       - run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Build portable Windows x64 preview
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npm run build --prefix web
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend production build failed' }
+          $env:CHATCMD_BUILD_VERSION = "workspace-preview-${{ github.sha }}"
+          cargo build --release --features embedded-web --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Windows x64 release build failed' }
+          New-Item -ItemType Directory -Path staging -Force | Out-Null
+          Copy-Item 'target/x86_64-pc-windows-msvc/release/chat-cmd-client.exe' 'staging/ChatCMD.exe'
+          Copy-Item 'chatgpt-extension' 'staging/chatgpt-extension' -Recurse -Force
+          Set-Content 'staging/chatcmd-version.txt' -Value $env:CHATCMD_BUILD_VERSION -Encoding ascii
+          $hash = (Get-FileHash 'staging/ChatCMD.exe' -Algorithm SHA256).Hash
+          Set-Content 'staging/SHA256SUMS.txt' -Value "$hash  ChatCMD.exe" -Encoding ascii
+          Compress-Archive -Path 'staging/*' -DestinationPath 'ChatCMD-windows-x64-workspace-preview.zip'
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && success()
+        with:
+          name: ChatCMD-windows-x64-workspace-preview
+          path: ChatCMD-windows-x64-workspace-preview.zip
+          if-no-files-found: error
+          retention-days: 14
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 20
