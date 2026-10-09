@@ -4,6 +4,7 @@ use crate::{
 use tokio::process::Command;
 
 fn background_command(program: &str) -> Command {
+    #[allow(unused_mut)] // Windows-only creation_flags mutates the command.
     let mut command = Command::new(program);
     #[cfg(windows)]
     {
