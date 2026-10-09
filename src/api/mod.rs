@@ -54,7 +54,6 @@ use overview::default_shell;
 use settings::*;
 use subagents::*;
 use task_controls::*;
-use task_workspace::*;
 use task_execution_mode::*;
 
 use std::{collections::BTreeMap, sync::Arc};
