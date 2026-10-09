@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --prefix web
-      - run: cargo test --workspace
+      - run: cargo test --workspace --no-fail-fast
       - run: cargo build --bin chat-cmd-client
         if: runner.os == 'Windows'
       - name: Build portable Windows x64 preview
@@ -63,6 +63,16 @@ jobs:
       # Keep strict Clippy reporting, but do not discard a fully tested
       # portable preview solely because of pre-existing compiler lint debt.
       - run: cargo clippy --workspace --all-targets -- -D warnings
+  clippy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
   frontend:
     runs-on: ubuntu-latest
     timeout-minutes: 20
