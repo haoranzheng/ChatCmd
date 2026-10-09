@@ -250,8 +250,14 @@ pub(super) async fn delete_workspace_project(
         deleted += 1;
     }
 
-    sqlx::query("DELETE FROM task_workspace_access WHERE project_id=?")
-        .bind(&id).execute(state.repository.pool()).await.map_err(db_problem)?;
+    let now = now_ms();
+    // Keep a restrictive tombstone so deleting a project cannot revive legacy path grants.
+    sqlx::query("UPDATE task_workspace_access SET access_mode='restricted', project_id=NULL, updated_at_ms=? WHERE project_id=?")
+        .bind(now).bind(&id).execute(state.repository.pool()).await.map_err(db_problem)?;
+    sqlx::query("UPDATE approvals SET state='cancelled',decision_json=json_object('reason','workspace project removed'),resolved_at_ms=? WHERE task_id IN (SELECT task_id FROM task_workspace_access WHERE project_id IS NULL) AND state='pending'")
+        .bind(now).execute(state.repository.pool()).await.map_err(db_problem)?;
+    sqlx::query("UPDATE approval_grants SET state='revoked',updated_at_ms=? WHERE task_id IN (SELECT task_id FROM task_workspace_access WHERE project_id IS NULL) AND state='active'")
+        .bind(now).execute(state.repository.pool()).await.map_err(db_problem)?;
     sqlx::query("DELETE FROM workspace_projects WHERE id=?")
         .bind(&id)
         .execute(state.repository.pool())
