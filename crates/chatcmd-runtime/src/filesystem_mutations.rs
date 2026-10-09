@@ -159,6 +159,11 @@ impl WorkspaceService {
             },
         )?;
         let target_path = target.path();
+        // Serialize the version check and atomic replacement for this exact
+        // canonical target. Two tasks with the same expectedVersion must not
+        // both commit, even if both passed an earlier asynchronous precheck.
+        // The owned guard remains held while spawn_blocking performs the rename.
+        let _atomic_write_guard = self.atomic_write_lock(&target_path)?.lock_owned().await;
         self.policy
             .authorize(&PolicyContext {
                 agent_id: context.agent_id.clone(),
