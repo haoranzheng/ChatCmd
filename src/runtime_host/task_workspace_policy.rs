@@ -51,7 +51,10 @@ impl RuntimeHost {
             return Err(RuntimeError::new("permission_change_requires_user",
                 "This task has no local read-write workspace authorization. Bind a project and approve read-write access in ChatCMD."));
         }
-        let root = std::fs::canonicalize(row.get::<&str,_>("project_path")).map_err(|_| {
+        let project_path = row.get::<Option<String>, _>("project_path")
+            .ok_or_else(|| RuntimeError::new("approval_scope_invalid",
+                "The authorized workspace project has been deleted."))?;
+        let root = std::fs::canonicalize(&project_path).map_err(|_| {
             RuntimeError::new("approval_scope_invalid", "The authorized workspace directory is unavailable.")
         })?;
         if !root.is_dir() || root.parent().is_none() {
