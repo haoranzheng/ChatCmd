@@ -32,7 +32,11 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --prefix web
+      # SQLite integration tests contend for file handles under Windows when the
+      # entire test binary runs at the default host-parallelism.
       - run: cargo test --workspace --no-fail-fast
+        env:
+          RUST_TEST_THREADS: '2'
       - run: cargo build --bin chat-cmd-client
         if: runner.os == 'Windows'
       - name: Build portable Windows x64 preview
