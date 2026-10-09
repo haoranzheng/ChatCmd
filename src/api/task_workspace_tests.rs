@@ -91,7 +91,7 @@ async fn authorized_write_is_scoped_and_revocation_blocks_subsequent_writes() {
     let denied = host.dispatch("fs_replace_text",
         context(&task,&agent,"fs_replace_text","after-revoke"),
         json!({"path":file,"oldText":"after","newText":"illegal"})).await.expect_err("revoke");
-    assert_eq!(denied.code, "permission_change_requires_user");
+    assert_eq!(denied.code, "policy_denied");
     assert_eq!(std::fs::read_to_string(&file).expect("read after revoke"), "after");
 }
 
