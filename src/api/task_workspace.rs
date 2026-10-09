@@ -32,7 +32,7 @@ pub(super) async fn task_workspace(
     Ok(Json(json!({
         "taskId": id,
         "projectFolder": task.get::<Option<String>, _>("project_folder"),
-        "projectId": binding.as_ref().map(|row| row.get::<String, _>("project_id")),
+        "projectId": binding.as_ref().and_then(|row| row.get::<Option<String>, _>("project_id")),
         "accessMode": binding.as_ref().map_or("readOnly", |row| row.get::<&str, _>("access_mode")),
         "locallyAuthorized": binding.is_some()
     })))
