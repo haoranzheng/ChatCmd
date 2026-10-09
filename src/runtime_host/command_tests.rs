@@ -67,6 +67,12 @@ async fn command_run_wire_preserves_nonzero_exit_as_execution_result() {
     );
     #[cfg(not(windows))]
     let (executable, arguments) = ("/bin/sh", json!(["-c", "printf PASS; exit 7"]));
+    // PowerShell process startup is significantly slower on loaded Windows CI.
+    // Timeout still must be enforced by the runner, not treated as an exit.
+    #[cfg(windows)]
+    let timeout_ms = 20_000;
+    #[cfg(not(windows))]
+    let timeout_ms = 5_000;
     let result = host
         .call_persisted(
             "command_run",
@@ -75,7 +81,7 @@ async fn command_run_wire_preserves_nonzero_exit_as_execution_result() {
                 "executable": executable,
                 "arguments": arguments,
                 "cwd": directory.path(),
-                "timeoutMs": 5_000
+                "timeoutMs": timeout_ms
             }),
         )
         .await
