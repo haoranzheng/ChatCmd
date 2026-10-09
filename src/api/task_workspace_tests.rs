@@ -161,3 +161,22 @@ async fn management_session_is_required_for_workspace_mutation() {
     let response = app.oneshot(request).await.expect("route response");
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn removing_a_saved_project_keeps_a_restrictive_tombstone() {
+    let project = tempfile::tempdir().expect("temporary project");
+    let (host, state, task, project_id, _db) = fixture(project.path()).await;
+    let agent: String = sqlx::query_scalar("SELECT agent_id FROM tasks WHERE id=?")
+        .bind(&task).fetch_one(state.repository.pool()).await.expect("agent");
+    bind(state.clone(), &task, &project_id, "readWrite").await;
+    crate::api::workspaces::delete_workspace_project(
+        State(state.clone()), AxumPath(project_id)).await.expect("delete saved project");
+    let row = task_workspace(State(state), AxumPath(task.clone())).await.expect("tombstone");
+    assert_eq!(row.0["accessMode"], "restricted");
+    assert!(row.0["projectId"].is_null());
+    let error = host.require_workspace_access(
+        &context(&task,&agent,"fs_read_text","tombstone-read"),
+        "fs_read_text",
+        &json!({"path":project.path().join("any.txt")})).await.expect_err("project deletion revokes reads");
+    assert_eq!(error.code, "policy_denied");
+}
