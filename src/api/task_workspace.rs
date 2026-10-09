@@ -90,7 +90,7 @@ fn missing_task() -> Problem {
     Problem::new(StatusCode::NOT_FOUND, "Task not found", "The task no longer exists.")
 }
 
-fn validate_workspace_root(value: &str) -> Result<PathBuf, Problem> {
+pub(super) fn validate_workspace_root(value: &str) -> Result<PathBuf, Problem> {
     let requested = FsPath::new(value);
     if !requested.is_absolute() {
         return Err(Problem::new(StatusCode::BAD_REQUEST, "Invalid workspace path",
