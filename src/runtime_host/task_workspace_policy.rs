@@ -31,17 +31,23 @@ impl RuntimeHost {
         ).bind(task_id).fetch_optional(self.repository.pool()).await
             .map_err(|_| RuntimeError::new("storage_error", "workspace authorization lookup failed"))?;
 
-        // Preserve legacy explicit user-message reads, but never turn them into writes.
-        if !is_workspace_write_tool(tool) {
-            if row.as_ref().is_some_and(|r| r.get::<&str,_>("access_mode") == "restricted") {
-                return Err(RuntimeError::new("policy_denied",
-                    "The local user has restricted this task's workspace access."));
-            }
-            return Ok(());
+        // Existing unbound read-only tasks retain the legacy explicit-message scope.
+        // Bound tasks, however, are confined to the chosen project for reads AND writes.
+        let write = is_workspace_write_tool(tool);
+        let Some(row) = row else {
+            return if write {
+                Err(RuntimeError::new("permission_change_requires_user",
+                    "Writing requires a workspace selected and authorized in the authenticated local ChatCMD UI."))
+            } else {
+                Ok(())
+            };
+        };
+        let access_mode = row.get::<&str, _>("access_mode");
+        if access_mode == "restricted" {
+            return Err(RuntimeError::new("policy_denied",
+                "The local user has restricted this task's workspace access."));
         }
-        let row = row.ok_or_else(|| RuntimeError::new("permission_change_requires_user",
-            "Writing requires a workspace selected and authorized in the authenticated local ChatCMD UI."))?;
-        if row.get::<&str, _>("access_mode") != "readWrite" {
+        if write && access_mode != "readWrite" {
             return Err(RuntimeError::new("permission_change_requires_user",
                 "This task has no local read-write workspace authorization. Bind a project and approve read-write access in ChatCMD."));
         }
@@ -59,7 +65,7 @@ impl RuntimeHost {
         }
         let targets = mutation_paths(tool, arguments, &root)?;
         if targets.is_empty() {
-            return Err(RuntimeError::new("invalid_arguments", "Mutating tools require an explicit scoped path."));
+            return Err(RuntimeError::new("invalid_arguments", "Filesystem operations require an explicit scoped path."));
         }
         for target in targets {
             validate_target_in_root(&root, &target)?;
@@ -69,15 +75,32 @@ impl RuntimeHost {
 }
 
 fn mutation_paths(tool: &str, args: &Value, root: &Path) -> RuntimeResult<Vec<PathBuf>> {
-    if tool == "git_commit" {
-        let raw = args.get("cwd").and_then(Value::as_str).unwrap_or(".");
-        return Ok(vec![resolve_target(root, raw)?]);
+    if tool.starts_with("git_") {
+        return Ok(vec![resolve_target(root,
+            args.get("cwd").and_then(Value::as_str).unwrap_or("."))?]);
     }
     let mut result = Vec::new();
     for field in ["path", "source", "destination", "quarantinePath"] {
         if let Some(raw) = args.get(field).and_then(Value::as_str) {
             result.push(resolve_target(root, raw)?);
         }
+    }
+    if let Some(paths) = args.get("paths").and_then(Value::as_array) {
+        for path in paths {
+            let raw = path.as_str().ok_or_else(|| RuntimeError::new(
+                "invalid_arguments", "Expected a string workspace path."))?;
+            result.push(resolve_target(root, raw)?);
+        }
+    }
+    if let Some(requests) = args.get("requests").and_then(Value::as_array) {
+        for req in requests {
+            if let Some(raw) = req.get("path").and_then(Value::as_str) {
+                result.push(resolve_target(root, raw)?);
+            }
+        }
+    }
+    if result.is_empty() && tool == "workspace_index_status" {
+        result.push(root.to_path_buf());
     }
     Ok(result)
 }
