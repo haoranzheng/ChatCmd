@@ -320,7 +320,7 @@ fn changed_time_ns(_metadata: &fs::Metadata) -> Option<u64> {
 }
 
 #[cfg(windows)]
-fn windows_file_identity(path: &Path) -> RuntimeResult<(u32, u64)> {
+pub(super) fn windows_file_identity(path: &Path) -> RuntimeResult<(u32, u64)> {
     use std::{mem::MaybeUninit, os::windows::io::AsRawHandle as _};
     use windows_sys::Win32::Storage::FileSystem::{
         BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
