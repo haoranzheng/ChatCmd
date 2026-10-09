@@ -11,7 +11,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: ${{ github.workflow }}-workspace-r4-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-workspace-r5-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
   rust:

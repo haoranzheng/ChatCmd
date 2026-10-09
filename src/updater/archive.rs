@@ -2,7 +2,7 @@ use std::{
     fmt::Write as _,
     fs::File as StdFile,
     io::{Read, Write},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use anyhow::{Context, Result, anyhow, bail};
