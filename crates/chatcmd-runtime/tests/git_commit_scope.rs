@@ -461,7 +461,11 @@ async fn all_preview_reports_dirty_paths_without_mutating_index_or_head() {
 
     assert!(preview.all);
     assert!(preview.unstaged_paths.contains(&"tracked.txt".to_owned()));
-    assert!(preview.untracked_paths.contains(&"untracked.txt".to_owned()));
+    assert!(
+        preview
+            .untracked_paths
+            .contains(&"untracked.txt".to_owned())
+    );
     assert!(preview.staged_paths.is_empty());
     assert_eq!(
         git(directory.path(), &["diff", "--cached", "--binary"]),
