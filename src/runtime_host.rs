@@ -27,6 +27,7 @@ mod subagent_fallback;
 mod subagent_tests;
 mod subagents;
 mod task_serialization;
+mod task_workspace_policy;
 mod terminal_lifecycle;
 mod tool_event_projection;
 mod turn_file_changes;
