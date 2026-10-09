@@ -71,6 +71,10 @@ async fn authorized_write_is_scoped_and_revocation_blocks_subsequent_writes() {
     let agent: String = sqlx::query_scalar("SELECT agent_id FROM tasks WHERE id=?")
         .bind(&task).fetch_one(state.repository.pool()).await.expect("agent");
     bind(state.clone(), &task, &project_id, "readWrite").await;
+    let denied_read = host.require_workspace_access(
+        &context(&task,&agent,"fs_read_text","read-outside"),"fs_read_text",
+        &json!({"path":external})).await.expect_err("read outside bound workspace");
+    assert_eq!(denied_read.code,"path_outside_allowed_scope");
     let approved_mode: String = sqlx::query_scalar("SELECT mode FROM task_execution_modes WHERE task_id=?")
         .bind(&task).fetch_one(state.repository.pool()).await.expect("approval policy");
     assert_eq!(approved_mode, "approval");
