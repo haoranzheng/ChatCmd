@@ -31,6 +31,8 @@ jobs:
           node-version: '22'
       - run: npm ci --prefix web
       - run: cargo test --workspace
+      - run: cargo build --bin chat-cmd-client
+        if: runner.os == 'Windows'
       - run: cargo clippy --workspace --all-targets -- -D warnings
   frontend:
     runs-on: ubuntu-latest
