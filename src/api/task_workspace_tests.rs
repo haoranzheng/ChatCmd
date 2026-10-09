@@ -130,3 +130,30 @@ fn windows_junction_is_never_a_workspace_root() {
     assert!(output.status.success(), "junction creation not available: {}", String::from_utf8_lossy(&output.stderr));
     assert!(super::validate_workspace_root(junction.to_str().expect("unicode path")).is_err());
 }
+
+#[tokio::test]
+async fn mcp_extension_cannot_bind_or_grant_a_workspace() {
+    use crate::api::chatgpt_router_tests::{extension_request, fixture};
+    use axum::http::StatusCode;
+    let (_state, app, _temp) = fixture("completed").await;
+    let result = extension_request(&app, "PUT", "/api/local/tasks/task-a/workspace",
+        json!({"projectId":"project-a","accessMode":"readWrite"})).await;
+    assert_eq!(result.status(), StatusCode::FORBIDDEN);
+    let result = extension_request(&app, "GET", "/api/local/tasks/task-a/workspace",
+        json!({})).await;
+    assert_eq!(result.status(), StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn management_session_is_required_for_workspace_mutation() {
+    use crate::api::chatgpt_router_tests::fixture;
+    use axum::{body::Body, http::{Request, StatusCode}};
+    use tower::ServiceExt;
+    let (_state, app, _temp) = fixture("completed").await;
+    let request = Request::builder().method("PUT").uri("/api/local/tasks/task-a/workspace")
+        .header("X-ChatCmdClient", "local-ui").header("Content-Type", "application/json")
+        .body(Body::from(json!({"projectId":"none","accessMode":"readWrite"}).to_string()))
+        .expect("local request");
+    let response = app.oneshot(request).await.expect("route response");
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
