@@ -5,9 +5,8 @@ impl RuntimeHost {
         tool: &str,
         arguments: &Value,
     ) -> RuntimeResult<()> {
-        if tool.starts_with("fs_") || tool.starts_with("git_") || matches!(tool, "workspace_index_status" | "workspace_index_rebuild") {
-            self.require_workspace_access(context, tool, arguments).await?;
-        }
+        let scoped_tool = tool.starts_with("fs_") || tool.starts_with("git_")
+            || matches!(tool, "workspace_index_status" | "workspace_index_rebuild");
         let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
         let capabilities = tool_capabilities(tool);
         if capabilities.is_permission_change() {
@@ -17,26 +16,26 @@ impl RuntimeHost {
             ));
         }
         if !capabilities.is_execution_policy_controlled() {
+            if scoped_tool {
+                self.require_workspace_access(context, tool, arguments).await?;
+            }
             return Ok(());
         }
         let task_id = TaskId::new(context.task_id.as_deref().unwrap_or_default())
             .map_err(|error| invalid("taskId", error))?;
         let mode_task_id = self.execution_mode_task_id(&task_id).await?;
-        match self
-            .repository
-            .execution_mode(Some(&mode_task_id))
-            .await
-            .map_err(storage_error)?
-        {
-            chatcmd_core::ExecutionMode::Allow if !writes_workspace => return Ok(()),
-            chatcmd_core::ExecutionMode::Allow => {},
-            chatcmd_core::ExecutionMode::Deny => {
-                return Err(RuntimeError::new(
-                    "policy_denied",
-                    "conversation access mode denied this operation",
-                ));
-            }
-            chatcmd_core::ExecutionMode::Approval => {}
+        let execution_mode = self.repository.execution_mode(Some(&mode_task_id))
+            .await.map_err(storage_error)?;
+        // An explicit task/root Deny wins before any missing-workspace recovery error.
+        if execution_mode == chatcmd_core::ExecutionMode::Deny {
+            return Err(RuntimeError::new("policy_denied",
+                "conversation access mode denied this operation"));
+        }
+        if scoped_tool {
+            self.require_workspace_access(context, tool, arguments).await?;
+        }
+        if execution_mode == chatcmd_core::ExecutionMode::Allow && !writes_workspace {
+            return Ok(());
         }
 
         let resolved_arguments = self
