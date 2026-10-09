@@ -49,7 +49,13 @@ impl RuntimeHost {
         } else {
             None
         };
-        let mut task_path_scopes = if filesystem_tool
+        let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
+        if filesystem_tool || tool == "git_commit" {
+            self.require_workspace_access(&context, tool, &arguments).await?;
+        }
+        let mut task_path_scopes = if writes_workspace {
+            Vec::new()
+        } else if filesystem_tool
             || tool.starts_with("git_")
             || matches!(tool, "command_run" | "shell_create" | "workspace_roots")
         {
@@ -67,7 +73,7 @@ impl RuntimeHost {
         } else {
             arguments
         };
-        if filesystem_tool || tool.starts_with("git_") {
+        if (filesystem_tool || tool.starts_with("git_")) && !writes_workspace {
             task_path_scopes.extend(path_scopes::argument_path_scopes(&arguments));
             task_path_scopes.sort();
             task_path_scopes.dedup();
