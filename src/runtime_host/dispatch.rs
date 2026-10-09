@@ -28,7 +28,7 @@ use super::{
 };
 
 impl RuntimeHost {
-    pub(super) async fn dispatch(
+    pub(crate) async fn dispatch(
         &self,
         tool: &str,
         context: OperationContext,
