@@ -26,6 +26,10 @@ jobs:
       - run: cargo fmt --all -- --check
         continue-on-error: true # Existing formatting debt; report failure but run compilation/test checks
       - run: cargo check --workspace --all-targets
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix web
       - run: cargo test --workspace
       - run: cargo clippy --workspace --all-targets -- -D warnings
   frontend:
