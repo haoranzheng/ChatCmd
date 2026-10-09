@@ -301,14 +301,14 @@ fn resolve_install_destinations(
             .ok_or_else(|| anyhow!("current executable has no parent directory"))?
             .to_path_buf();
         let extension_destination = working_directory.join("chatgpt-extension");
-        return Ok((
+        Ok((
             InstallPayload::Executable {
                 source,
                 destination: current_exe.to_path_buf(),
             },
             working_directory,
             extension_destination,
-        ));
+        ))
     }
     #[cfg(target_os = "macos")]
     {
