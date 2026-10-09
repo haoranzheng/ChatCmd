@@ -150,3 +150,7 @@ mod tests {
         assert!(validate_workspace_root(link.to_str().expect("utf8")).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "task_workspace_tests.rs"]
+mod integration_tests;
