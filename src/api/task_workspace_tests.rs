@@ -310,14 +310,14 @@ async fn removing_a_saved_project_keeps_a_restrictive_tombstone() {
     crate::api::workspaces::delete_workspace_project(State(state.clone()), AxumPath(project_id))
         .await
         .expect("delete saved project");
-    let row = task_workspace(State(state), AxumPath(task.clone()))
+    let row = task_workspace(State(state.clone()), AxumPath(task.clone()))
         .await
         .expect("tombstone");
     assert_eq!(row.0["accessMode"], "restricted");
     assert!(row.0["projectId"].is_null());
     let pending: String =
         sqlx::query_scalar("SELECT state FROM approvals WHERE id='unrelated-approval'")
-            .fetch_one(host.repository.pool())
+            .fetch_one(state.repository.pool())
             .await
             .expect("unrelated approval retained");
     assert_eq!(pending, "pending");
