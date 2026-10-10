@@ -84,6 +84,20 @@ pub(super) async fn set_task_desktop_trust(
             "Enable Windows-MCP in Security settings before trusting the conversation.",
         ));
     }
+    let identity: Option<String> = sqlx::query_scalar(
+        "SELECT conversation_scope_hash FROM tasks WHERE id=?",
+    )
+    .bind(&id)
+    .fetch_one(state.repository.pool())
+    .await
+    .map_err(db_problem)?;
+    if !identity.as_deref().is_some_and(|scope| !scope.trim().is_empty()) {
+        return Err(Problem::new(
+            StatusCode::CONFLICT,
+            "Conversation identity unbound",
+            "Send a new ChatGPT message from this conversation to bind its identity before enabling desktop trust.",
+        ));
+    }
     // Do not create a dormant permission that will silently activate later:
     // the upstream must be healthy at the time of this explicit grant.
     let tools = crate::desktop_bridge::probe(port).await.map_err(|_| {

@@ -222,7 +222,8 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
             task_id,
             &agent_id,
             "desktop_observe",
-            8000
+            8000,
+            Some("desktop-trust")
         )
         .await
         .expect("observe trust")
@@ -232,8 +233,33 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
             host.repository.pool(),
             task_id,
             &agent_id,
+            "desktop_observe",
+            8000,
+            Some("different-conversation")
+        )
+        .await
+        .expect("cross-conversation trust denied")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "desktop_observe",
+            8000,
+            None
+        )
+        .await
+        .expect("unbound conversation trust denied")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
             "desktop_control",
-            8000
+            8000,
+            Some("desktop-trust")
         )
         .await
         .expect("control denied")
@@ -244,7 +270,8 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
             task_id,
             &agent_id,
             "desktop_observe",
-            8001
+            8001,
+            Some("desktop-trust")
         )
         .await
         .expect("different port denied")
@@ -255,7 +282,8 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
             second.task_id.as_deref().unwrap(),
             &agent_id,
             "desktop_observe",
-            8000
+            8000,
+            Some("desktop-trust")
         )
         .await
         .expect("other task denied")
@@ -266,7 +294,8 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
             task_id,
             "wrong-agent",
             "desktop_observe",
-            8000
+            8000,
+            Some("desktop-trust")
         )
         .await
         .expect("wrong agent denied")
@@ -277,7 +306,8 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
             task_id,
             &agent_id,
             "shell_create",
-            8000
+            8000,
+            Some("desktop-trust")
         )
         .await
         .expect("non-desktop tool denied")
@@ -293,7 +323,8 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
             task_id,
             &agent_id,
             "desktop_control",
-            8000
+            8000,
+            Some("desktop-trust")
         )
         .await
         .unwrap()
@@ -309,7 +340,8 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
             task_id,
             &agent_id,
             "desktop_observe",
-            8000
+            8000,
+            Some("desktop-trust")
         )
         .await
         .unwrap()
@@ -319,7 +351,8 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
 #[tokio::test]
 async fn trusted_desktop_control_skips_individual_approval_only_when_enabled() {
     let (host, agent_id, _temp) = user_message_tests::test_host().await;
-    let context = task_context(&host, &agent_id, "desktop-auto-approval").await;
+    let mut context = task_context(&host, &agent_id, "desktop-auto-approval").await;
+    context.conversation_scope_id = Some("desktop-auto-approval".to_owned());
     let task_id = context.task_id.as_deref().expect("task");
     sqlx::query(
         "INSERT INTO settings(key,value_json,updated_at_ms) VALUES('desktop_enabled','true',0)",

@@ -55,6 +55,7 @@ impl RuntimeHost {
                     &context.agent_id,
                     tool,
                     port,
+                    context.conversation_scope_id.as_deref(),
                 )
                 .await?
             {

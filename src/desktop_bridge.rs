@@ -37,10 +37,16 @@ pub(crate) async fn is_trusted(
     agent_id: &str,
     tool: &str,
     port: u16,
+    conversation_scope: Option<&str>,
 ) -> RuntimeResult<bool> {
     if !matches!(tool, "desktop_observe" | "desktop_control") {
         return Ok(false);
     }
+    // A caller-supplied task id is insufficient: scope must also match the
+    // conversation identity persisted when this task was first created.
+    let Some(conversation_scope) = conversation_scope.filter(|value| !value.is_empty()) else {
+        return Ok(false);
+    };
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |duration| {
@@ -49,11 +55,13 @@ pub(crate) async fn is_trusted(
     let exists: i64 = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM desktop_task_trust d JOIN tasks t ON t.id=d.task_id
          WHERE d.task_id=? AND d.agent_id=? AND t.agent_id=d.agent_id
+         AND t.conversation_scope_hash=?
          AND d.port=? AND d.expires_at_ms>?
          AND (d.scope='control' OR (?='desktop_observe' AND d.scope='observe')))",
     )
     .bind(task_id)
     .bind(agent_id)
+    .bind(conversation_scope)
     .bind(i64::from(port))
     .bind(now)
     .bind(tool)
