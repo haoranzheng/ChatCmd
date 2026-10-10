@@ -400,14 +400,16 @@ mod tests {
             .expect("approval task join")
             .expect("approved shell create");
 
-        for _ in 0..100 {
+        // ConPTY + powershell.exe startup on Windows CI can take several seconds.
+        // Still assert that no side effect occurred *before* approval above.
+        for _ in 0..1_000 {
             if sentinel.exists() {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
         assert_eq!(
-            std::fs::read_to_string(&sentinel).expect("sentinel"),
+            std::fs::read_to_string(&sentinel).expect("approved command must create sentinel"),
             "once"
         );
         let replay = <RuntimeHost as chatcmd_mcp::RuntimeApi>::call(

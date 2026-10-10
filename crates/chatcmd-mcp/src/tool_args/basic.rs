@@ -1,5 +1,32 @@
 tool_args!(NoArgs {});
 tool_args!(DeviceGetArgs { device_id: String });
+tool_args!(DesktopObserveArgs {
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    kind: Option<String>
+});
+tool_args!(DesktopControlArgs {
+    action: String,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    loc: Option<Vec<i64>>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    label: Option<u64>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    text: Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    shortcut: Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    name: Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    direction: Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    wheel_times: Option<u64>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    button: Option<String>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    clicks: Option<u64>,
+    #[serde(default,skip_serializing_if="Option::is_none")]
+    clear: Option<bool>
+});
 tool_args!(SessionArgs { session_id: String });
 tool_args!(PathArgs { path: String });
 tool_args!(ProjectContextArgs {

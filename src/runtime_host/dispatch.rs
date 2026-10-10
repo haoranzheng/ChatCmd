@@ -28,7 +28,7 @@ use super::{
 };
 
 impl RuntimeHost {
-    pub(super) async fn dispatch(
+    pub(crate) async fn dispatch(
         &self,
         tool: &str,
         context: OperationContext,
@@ -49,7 +49,24 @@ impl RuntimeHost {
         } else {
             None
         };
-        let mut task_path_scopes = if filesystem_tool
+        let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
+        if filesystem_tool
+            || tool.starts_with("git_")
+            || matches!(tool, "workspace_roots" | "project_context")
+        {
+            self.require_workspace_access(&context, tool, &arguments)
+                .await?;
+        }
+        let additional_roots =
+            if filesystem_tool || tool.starts_with("git_") || tool == "workspace_roots" {
+                self.additional_workspace_roots(context.task_id.as_deref())
+                    .await?
+            } else {
+                Vec::new()
+            };
+        let mut task_path_scopes = if writes_workspace {
+            Vec::new()
+        } else if filesystem_tool
             || tool.starts_with("git_")
             || matches!(tool, "command_run" | "shell_create" | "workspace_roots")
         {
@@ -62,12 +79,15 @@ impl RuntimeHost {
         {
             task_path_scopes.push(project_folder.clone());
         }
+        task_path_scopes.extend(additional_roots.iter().cloned());
+        task_path_scopes.sort();
+        task_path_scopes.dedup();
         let arguments = if filesystem_tool {
             filesystem_dispatch::resolve_relative_paths(arguments, project_folder.as_deref())?
         } else {
             arguments
         };
-        if filesystem_tool || tool.starts_with("git_") {
+        if tool.starts_with("git_") && !writes_workspace {
             task_path_scopes.extend(path_scopes::argument_path_scopes(&arguments));
             task_path_scopes.sort();
             task_path_scopes.dedup();
@@ -90,6 +110,16 @@ impl RuntimeHost {
         }
 
         match tool {
+            "desktop_observe" | "desktop_control" => {
+                let (enabled, port) = crate::desktop_bridge::config(self.repository.pool()).await?;
+                if !enabled {
+                    return Err(RuntimeError::new(
+                        "desktop_disabled",
+                        "Enable Windows desktop integration in ChatCMD Security settings",
+                    ));
+                }
+                crate::desktop_bridge::invoke(port, tool, &arguments).await
+            }
             "device_list" => value(vec![self.local_device()]),
             "device_get" => {
                 let input: DeviceGet = parse(arguments)?;
@@ -229,7 +259,11 @@ impl RuntimeHost {
                 value(self.shell.inspect(&input.session_id).await?)
             }
             "workspace_roots" => match project_folder {
-                Some(project_folder) => value(vec![project_folder]),
+                Some(project_folder) => {
+                    let mut roots = vec![project_folder];
+                    roots.extend(additional_roots);
+                    value(roots)
+                }
                 None => value(task_path_scopes),
             },
             "project_context" => {

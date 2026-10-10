@@ -211,7 +211,7 @@ async fn git_corrupt_repository_and_index_lock_fail_without_panicking() {
         .expect("locked index returns bounded outcome");
     assert_ne!(output.exit_code, Some(0));
     match output.structured {
-        Some(GitStructuredOutput::Commit(data)) => assert_eq!(data.phase, "commitHooksIncluded"),
+        Some(GitStructuredOutput::Commit(data)) => assert_eq!(data.phase, "staging"),
         other => panic!("expected commit failure metadata, got {other:?}"),
     }
 }

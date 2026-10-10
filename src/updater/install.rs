@@ -1,14 +1,17 @@
 use std::{
     fs::OpenOptions,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
     time::Duration,
 };
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, anyhow, bail};
 
 const INSTALL_ERROR_FILE: &str = "chatcmd-update-error.txt";
 
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
 #[derive(Clone, Debug)]
 pub(crate) struct PreparedUpdate {
     pub version: String,
@@ -21,6 +24,7 @@ pub(crate) struct PreparedUpdate {
     port: u16,
 }
 
+#[cfg_attr(not(any(target_os = "windows", target_os = "macos")), allow(dead_code))]
 #[derive(Clone, Debug)]
 enum InstallPayload {
     Executable {
@@ -297,14 +301,14 @@ fn resolve_install_destinations(
             .ok_or_else(|| anyhow!("current executable has no parent directory"))?
             .to_path_buf();
         let extension_destination = working_directory.join("chatgpt-extension");
-        return Ok((
+        Ok((
             InstallPayload::Executable {
                 source,
                 destination: current_exe.to_path_buf(),
             },
             working_directory,
             extension_destination,
-        ));
+        ))
     }
     #[cfg(target_os = "macos")]
     {
@@ -371,6 +375,7 @@ fn locate_payload_root(extract_dir: &Path) -> Result<PathBuf> {
     bail!("update package layout is not recognized")
 }
 
+#[allow(unused_variables)]
 fn has_expected_payload(root: &Path) -> bool {
     #[cfg(target_os = "windows")]
     return find_child(root, "ChatCMD.exe", false).is_some();
@@ -441,6 +446,7 @@ fn find_extension_folder(root: &Path) -> Option<PathBuf> {
     })
 }
 
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 fn find_child(root: &Path, name: &str, directory: bool) -> Option<PathBuf> {
     std::fs::read_dir(root).ok()?.flatten().find_map(|entry| {
         let path = entry.path();

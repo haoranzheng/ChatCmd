@@ -10,6 +10,7 @@ mod catalog_seed;
 mod chatgpt_message;
 mod chatgpt_queue;
 mod chatgpt_transcript;
+mod desktop_bridge;
 #[cfg(all(not(debug_assertions), any(target_os = "windows", target_os = "macos")))]
 mod desktop_tray;
 #[cfg(feature = "embedded-web")]
@@ -489,10 +490,20 @@ mod tests {
         ]
         .into_iter()
         .flat_map(str::lines)
-        .filter_map(|line| {
-            let rest = line.strip_prefix("            \"")?;
-            let (name, tail) = rest.split_once('"')?;
-            tail.trim_start().starts_with("=>").then(|| name.to_owned())
+        .flat_map(|line| {
+            if !line.starts_with("            \"") {
+                return Vec::new();
+            }
+            let Some((patterns, _)) = line.split_once("=>") else {
+                return Vec::new();
+            };
+            patterns
+                .split('|')
+                .filter_map(|pattern| {
+                    let value = pattern.trim().trim_start_matches('"');
+                    value.split_once('"').map(|(name, _)| name.to_owned())
+                })
+                .collect::<Vec<_>>()
         })
         .collect::<Vec<_>>();
         dispatched.sort_unstable();

@@ -7,10 +7,12 @@ use std::{
     fs::{self, File},
     io::{BufWriter, Write},
     path::{Path, PathBuf},
-    process::Command,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
+
+#[cfg(windows)]
+use std::process::Command;
 
 struct Approve;
 impl ApprovalDecision for Approve {

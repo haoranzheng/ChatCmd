@@ -61,7 +61,7 @@ async fn watchdog_timeout_force_closes_real_child_pty_process() {
         .shell
         .create(
             &child_context,
-            ShellCreateRequest {
+            chatcmd_runtime::ShellCreateRequest {
                 request_id: child_context.request_id.clone(),
                 working_directory: Some(directory.path().to_path_buf()),
                 executable: Some(std::path::PathBuf::from("/bin/sh")),

@@ -1,0 +1,136 @@
+name: Workspace binding and write scope checks
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'crates/**'
+      - 'web/**'
+      - 'docs/workspace-write-authorization.md'
+      - '.github/workflows/workspace-binding-ci.yml'
+  workflow_dispatch:
+    inputs:
+      package_windows_preview:
+        description: 'Run optional GitHub release packaging (default is local build)'
+        required: false
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-workspace-r5-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  rust:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo check --workspace --all-targets
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix web
+      # SQLite integration tests contend for file handles under Windows when the
+      # entire test binary runs at the default host-parallelism.
+      # Keep the known-good Windows path unchanged. On Linux, isolate the
+      # crate and host suites so stalled jobs produce an actionable location.
+      - name: Rust workspace tests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo test --workspace --no-fail-fast
+        env:
+          RUST_TEST_THREADS: '2'
+      - name: Rust library and MCP tests (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=10s 900s \
+            cargo test -p chatcmd-core -p chatcmd-storage -p chatcmd-runtime -p chatcmd-mcp --no-fail-fast -- --nocapture \
+            2>&1 | tee "${RUNNER_TEMP}/linux-libraries-tests.log"
+        env:
+          RUST_TEST_THREADS: '2'
+      - name: Rust client and host tests (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=10s 900s \
+            cargo test -p chat-cmd-client --no-fail-fast -- --nocapture \
+            2>&1 | tee "${RUNNER_TEMP}/linux-host-tests.log"
+        env:
+          RUST_TEST_THREADS: '2'
+      - name: Upload Linux test diagnostics
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-rust-test-diagnostics
+          path: |
+            ${{ runner.temp }}/linux-libraries-tests.log
+            ${{ runner.temp }}/linux-host-tests.log
+          if-no-files-found: warn
+          retention-days: 7
+      - run: cargo build --bin chat-cmd-client
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.package_windows_preview
+      - name: Build portable Windows x64 preview
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.package_windows_preview
+        shell: pwsh
+        run: |
+          npm run build --prefix web
+          if ($LASTEXITCODE -ne 0) { throw 'Frontend production build failed' }
+          $stamp = (Get-Date).ToUniversalTime().ToString('yy.MM.dd.HHmm')
+          $shortSha = ('${{ github.sha }}').Substring(0, 8)
+          $env:CHATCMD_BUILD_VERSION = "$stamp-preview-$shortSha"
+          cargo build --release --features embedded-web --target x86_64-pc-windows-msvc
+          if ($LASTEXITCODE -ne 0) { throw 'Windows x64 release build failed' }
+          New-Item -ItemType Directory -Path staging -Force | Out-Null
+          Copy-Item 'target/x86_64-pc-windows-msvc/release/chat-cmd-client.exe' 'staging/ChatCMD.exe'
+          Copy-Item 'chatgpt-extension' 'staging/chatgpt-extension' -Recurse -Force
+          Set-Content 'staging/chatcmd-version.txt' -Value $env:CHATCMD_BUILD_VERSION -Encoding ascii
+          $hash = (Get-FileHash 'staging/ChatCMD.exe' -Algorithm SHA256).Hash
+          Set-Content 'staging/SHA256SUMS.txt' -Value "$hash  ChatCMD.exe" -Encoding ascii
+          Compress-Archive -Path 'staging/*' -DestinationPath 'ChatCMD-windows-x64-workspace-preview.zip'
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.package_windows_preview && success()
+        with:
+          name: ChatCMD-windows-x64-workspace-preview
+          path: ChatCMD-windows-x64-workspace-preview.zip
+          if-no-files-found: error
+          retention-days: 14
+      # Keep strict Clippy reporting, but do not discard a fully tested
+      # portable preview solely because of pre-existing compiler lint debt.
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+  clippy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test -- --run
+      - run: npm run build

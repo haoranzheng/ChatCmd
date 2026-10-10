@@ -12,6 +12,7 @@ import { ErrorState, Loading, StatusBadge, formatTime } from '../components';
 import { tr, translatedStatus } from '../i18n';
 import { useRealtime } from '../realtime';
 import { TaskAccessCard } from '../tasks/TaskAccessCard';
+import { TaskWorkspaceAccessCard } from '../tasks/TaskWorkspaceAccessCard';
 import { TaskConversationStopCard } from '../tasks/TaskConversationStopCard';
 import { SubagentApprovalQueue } from '../tasks/SubagentApprovalQueue';
 import { TaskTerminalSection } from '../tasks/TaskTerminalSection';
@@ -146,6 +147,7 @@ function TaskDetailContent({ detail, realtime, onTaskChanged, hasOlder, loadingO
         <div className="task-info-duration"><Clock3 /><span>{formatTime(startedAt)} → {formatTime(task.updatedAtUtc)}</span></div>
         <TaskTerminalSection taskId={task.id} turnId={lastTurn?.id} />
         {(chatGpt || task.isSubagent) && <ChatGptTaskCard taskId={task.id} />}
+        <TaskWorkspaceAccessCard taskId={task.id} onBound={(folder) => onTaskChanged({ ...detail, task: { ...detail.task, projectFolder: folder } })} />
         <TaskAccessCard taskId={detail.executionModeSourceTaskId ?? task.id} grantTaskId={task.id} defaultMode={detail.executionMode ?? 'allowAll'} grants={detail.approvalGrants} />
         {chatGpt && <CompactHistoryCard />}
         {!chatGpt && <TaskConversationStopCard taskId={task.id} taskStatus={task.status} onStopped={onTaskChanged} />}

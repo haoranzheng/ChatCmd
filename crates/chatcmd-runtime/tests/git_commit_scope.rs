@@ -436,7 +436,7 @@ async fn preview_binds_selected_worktree_bytes_not_only_the_path() {
 }
 
 #[tokio::test]
-async fn all_rejects_unstaged_or_untracked_changes_without_mutating_index() {
+async fn all_preview_reports_dirty_paths_without_mutating_index_or_head() {
     let directory = repository();
     write(&directory.path().join("tracked.txt"), "base\n");
     commit_all(directory.path(), "base");
@@ -445,7 +445,10 @@ async fn all_rejects_unstaged_or_untracked_changes_without_mutating_index() {
     let index_before = git(directory.path(), &["diff", "--cached", "--binary"]);
     let head_before = git(directory.path(), &["rev-parse", "HEAD"]);
 
-    let error = service(directory.path())
+    // An all-scope preview is intentionally read-only: it describes files
+    // that would be staged by an approved all-scope commit, without staging
+    // anything during the preview.
+    let preview = service(directory.path())
         .preview_commit_with_options(
             directory.path(),
             true,
@@ -454,9 +457,16 @@ async fn all_rejects_unstaged_or_untracked_changes_without_mutating_index() {
             CancellationToken::new(),
         )
         .await
-        .expect_err("all must not implicitly stage worktree changes");
+        .expect("all preview should report pending worktree changes");
 
-    assert_eq!(error.code, "git_scope_conflict");
+    assert!(preview.all);
+    assert!(preview.unstaged_paths.contains(&"tracked.txt".to_owned()));
+    assert!(
+        preview
+            .untracked_paths
+            .contains(&"untracked.txt".to_owned())
+    );
+    assert!(preview.staged_paths.is_empty());
     assert_eq!(
         git(directory.path(), &["diff", "--cached", "--binary"]),
         index_before

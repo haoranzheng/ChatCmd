@@ -19,11 +19,22 @@ const READ_BUFFER_BYTES: usize = 64 * 1024;
 struct FileIdentity {
     size: u64,
     modified_ns: u128,
+    // Length plus modification time cannot distinguish an atomic replacement
+    // on Windows when the filesystem rounds timestamps. Bind continuation
+    // tokens to the OS file identity as well.
+    #[cfg(windows)]
+    volume_and_index: (u32, u64),
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
 }
 
 impl FileIdentity {
-    fn from_metadata(metadata: &std::fs::Metadata) -> Self {
-        Self {
+    fn from_metadata(metadata: &std::fs::Metadata, _path: &Path) -> RuntimeResult<Self> {
+        #[cfg(unix)]
+        use std::os::unix::fs::MetadataExt as _;
+        Ok(Self {
             size: metadata.len(),
             modified_ns: metadata
                 .modified()
@@ -31,7 +42,13 @@ impl FileIdentity {
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or(Duration::ZERO)
                 .as_nanos(),
-        }
+            #[cfg(windows)]
+            volume_and_index: super::file_version::windows_file_identity(_path)?,
+            #[cfg(unix)]
+            device: metadata.dev(),
+            #[cfg(unix)]
+            inode: metadata.ino(),
+        })
     }
 
     fn token(&self, path: &Path) -> String {
@@ -39,6 +56,13 @@ impl FileIdentity {
         path.hash(&mut hasher);
         self.size.hash(&mut hasher);
         self.modified_ns.hash(&mut hasher);
+        #[cfg(windows)]
+        self.volume_and_index.hash(&mut hasher);
+        #[cfg(unix)]
+        {
+            self.device.hash(&mut hasher);
+            self.inode.hash(&mut hasher);
+        }
         format!("v1-{:016x}", hasher.finish())
     }
 }
@@ -65,7 +89,7 @@ pub(crate) async fn read_text_v2(
     if !before.is_file() {
         return Err(RuntimeError::new("not_file", "path is not a regular file"));
     }
-    let identity = FileIdentity::from_metadata(&before);
+    let identity = FileIdentity::from_metadata(&before, &resolved)?;
     let version_token = identity.token(&resolved);
     if request
         .expected_version
@@ -100,7 +124,7 @@ pub(crate) async fn read_text_v2(
     };
 
     let after = tokio::fs::metadata(&resolved).await.map_err(io_error)?;
-    if FileIdentity::from_metadata(&after) != identity {
+    if FileIdentity::from_metadata(&after, &resolved)? != identity {
         return Err(RuntimeError::new(
             "file_changed_during_read",
             "file changed while the requested range was being read",

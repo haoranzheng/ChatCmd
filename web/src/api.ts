@@ -1,12 +1,14 @@
 import { tr } from './i18n';
 import type { CompactHistory, CompactJob } from './chatgpt/compact/types';
 import type { UpdateStatus } from './updates/types';
-import type { Agent, AgentInput, ChatGptBridge, ChatGptQueuedMessage, ChatGptRequest, CommandExecutionMode, LiveTerminalOutput, LocalSettings, McpStatus, Overview, PlanQuestion, PlanQuestionAnswer, PluginLink, ProblemDetails, SecretResult, Session, SessionDetail, Skill, SkillInstallPreview, SkillInstallResult, SkillOptionValue, Task, TaskActivityDetail, TaskDetail, TaskPage, Tool, ToolPreset, Tunnel, TunnelTestResult, UserSkill, WorkspaceProject } from './types';
+import type { Agent, AgentInput, ChatGptBridge, ChatGptQueuedMessage, ChatGptRequest, CommandExecutionMode, LiveTerminalOutput, LocalSettings, McpStatus, Overview, PlanQuestion, PlanQuestionAnswer, PluginLink, ProblemDetails, SecretResult, Session, SessionDetail, Skill, SkillInstallPreview, SkillInstallResult, SkillOptionValue, Task, TaskActivityDetail, TaskDetail, TaskPage, TaskWorkspaceAccess, WorkspaceAccessMode, Tool, ToolPreset, Tunnel, TunnelTestResult, UserSkill, WorkspaceProject } from './types';
 
 export class ApiError extends Error {
   constructor(message: string, public status?: number, public problem?: ProblemDetails) { super(message); this.name = 'ApiError'; }
 }
 
+export interface DesktopTrust { taskId: string; active: boolean; scope: 'none' | 'observe' | 'control'; expiresAtMs: number | null; port?: number }
+export interface DesktopHealth { enabled:boolean; connected:boolean; tools:string[]; checkedAtMs:number; error?:string; missingTools?:string[]; repairHints:string[]; checks:{launcherFound:boolean;portListening:boolean|null} }
 export interface ElevationStatus { supported: boolean; elevated: boolean }
 export interface AuthStatus { configured: boolean; authenticated: boolean; idleTimeoutSeconds: number }
 export interface DatabaseDiagnostics { path: string; tableCount: number; totalRows: number; fileSizeBytes: number; pageCount: number; pageSizeBytes: number; freePageCount: number; usedSizeBytes: number; tables: Array<{ name: string; rowCount: number }> }
@@ -99,6 +101,14 @@ export const api = {
   restartElevated: () => request<ElevationStatus>('/api/local/system/elevation/restart', { method: 'POST', body: '{}' }),
   exitApplication: () => request<{ closing: boolean }>('/api/local/system/exit', { method: 'POST', body: '{}' }),
   workspaceProjects: () => request<WorkspaceProject[]>('/api/local/workspaces/projects'),
+  desktopConfig: () => request<{enabled:boolean;port:number;endpoint:string}>('/api/local/desktop/config'),
+  setDesktopConfig: (input:{enabled:boolean;port:number}) => request<{enabled:boolean;port:number;endpoint:string}>('/api/local/desktop/config',{method:'PUT',body:json(input)}),
+  desktopStatus: () => request<DesktopHealth>('/api/local/desktop/status'),
+  taskDesktopTrust: (id: string) => request<DesktopTrust>(`/api/local/tasks/${item(id)}/desktop-trust`),
+  grantTaskDesktopTrust: (id: string, input: {scope:'observe'|'control';durationMinutes:15|60|480}) => request<DesktopTrust>(`/api/local/tasks/${item(id)}/desktop-trust`,{method:'PUT',body:json(input)}),
+  revokeTaskDesktopTrust: (id: string) => request<DesktopTrust>(`/api/local/tasks/${item(id)}/desktop-trust`,{method:'DELETE'}),
+  taskWorkspace: (id: string) => request<TaskWorkspaceAccess>(`/api/local/tasks/${item(id)}/workspace`),
+  setTaskWorkspace: (id: string, input: { projectId: string; additionalProjectIds: string[]; accessMode: WorkspaceAccessMode }) => request<TaskWorkspaceAccess>(`/api/local/tasks/${item(id)}/workspace`, { method: 'PUT', body: json(input) }),
   saveWorkspaceProject: (input: { name: string; path: string; chatGptProjectUrl?: string }) => request<WorkspaceProject>('/api/local/workspaces/projects', { method: 'POST', body: json(input) }),
   updateWorkspaceProject: (id: string, input: { name: string; path: string; chatGptProjectUrl?: string }) => request<WorkspaceProject>(`/api/local/workspaces/projects/${item(id)}`, { method: 'PUT', body: json(input) }),
   deleteWorkspaceProject: (id: string) => request<{ deleted: boolean; deletedConversations: number; preservedConversations: number }>(`/api/local/workspaces/projects/${item(id)}`, { method: 'DELETE' }),

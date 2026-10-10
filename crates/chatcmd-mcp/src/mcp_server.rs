@@ -53,7 +53,14 @@ impl McpServer {
         };
         let (context, value) = self.prepare_call(tool_name, arguments, authenticated);
         match self.runtime.call(tool_name, context, value).await {
-            Ok(value) => CallToolResult::structured(value),
+            Ok(value) => {
+                if tool_name == "desktop_observe" {
+                    if let Some(blocks) = desktop_visual_content(&value) {
+                        return CallToolResult::success(blocks);
+                    }
+                }
+                CallToolResult::structured(value)
+            },
             Err(error) => CallToolResult::structured_error(error_value(&error)),
         }
     }
@@ -176,4 +183,49 @@ fn catalog_mismatch(arguments: &ToolArguments) -> Option<CallToolResult> {
             "steps": ["discardCachedSchemas", "reconnect", "initialize", "listTools", "retryCall"]
         }
     })))
+}
+
+fn desktop_visual_content(value: &Value) -> Option<Vec<rmcp::model::ContentBlock>> {
+    let blocks = value.pointer("/result/content")?.as_array()?;
+    let mut output = Vec::new();
+    for block in blocks.iter().take(16) {
+        match block.get("type").and_then(Value::as_str) {
+            Some("text") => {
+                if let Some(text) = block.get("text").and_then(Value::as_str) {
+                    output.push(rmcp::model::ContentBlock::text(
+                        text.chars().take(64_000).collect::<String>()
+                    ));
+                }
+            }
+            Some("image") => {
+                let Some(mime) = block.get("mimeType").and_then(Value::as_str) else { continue; };
+                if !matches!(mime, "image/png" | "image/jpeg" | "image/webp") { continue; }
+                let Some(data) = block.get("data").and_then(Value::as_str) else { continue; };
+                if data.len() > 5_500_000 || !data.bytes().all(|c|
+                    c.is_ascii_alphanumeric() || c == b'+' || c == b'/' || c == b'='
+                ) { continue; }
+                output.push(rmcp::model::ContentBlock::image(data.to_owned(), mime));
+            }
+            _ => {}
+        }
+    }
+    (!output.is_empty()).then_some(output)
+}
+#[cfg(test)]
+mod desktop_visual_tests {
+    use super::*;
+    #[test]
+    fn preserves_text_and_safe_image_blocks() {
+        let input=serde_json::json!({"result":{"content":[
+          {"type":"text","text":"UI snapshot"},
+          {"type":"image","mimeType":"image/png","data":"aGVsbG8="},
+          {"type":"image","mimeType":"image/svg+xml","data":"PHN2Zz4="}
+        ]}});
+        let content=desktop_visual_content(&input).expect("desktop content");
+        assert_eq!(content.len(),2);
+    }
+    #[test]
+    fn missing_content_falls_back_to_structured_result() {
+        assert!(desktop_visual_content(&serde_json::json!({"result":{}})).is_none());
+    }
 }

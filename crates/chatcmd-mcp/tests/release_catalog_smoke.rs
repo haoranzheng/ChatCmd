@@ -108,7 +108,7 @@ async fn packaged_process_advertises_exact_manifest_contract_deterministically()
     assert!(names.iter().any(|name| name == "fs_replace_text"));
     assert!(names.iter().any(|name| name == "fs_apply_edits"));
     assert!(names.iter().any(|name| name == "project_context"));
-    assert_eq!(first_metadata.catalog_version, 8);
+    assert_eq!(first_metadata.catalog_version, 9);
     let project_context = first
         .iter()
         .find(|tool| tool["name"] == "project_context")

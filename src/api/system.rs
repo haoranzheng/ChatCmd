@@ -129,7 +129,7 @@ fn open_path(path: &Path) -> Result<(), String> {
             .arg(path)
             .spawn()
             .map_err(|error| format!("failed to open Explorer: {error}"))?;
-        return Ok(());
+        Ok(())
     }
     #[cfg(target_os = "macos")]
     {
@@ -161,9 +161,9 @@ fn open_browser_target(browser: &str, target: &str) -> Result<(), String> {
                 return Ok(());
             }
         }
-        return Err(format!(
+        Err(format!(
             "Could not find a supported {browser} executable on this computer."
-        ));
+        ))
     }
     #[cfg(target_os = "macos")]
     {

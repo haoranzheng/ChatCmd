@@ -61,11 +61,33 @@ fn approval_summary(tool: &str, risk: ToolRiskClass, arguments: &Value) -> Value
         .map(|path| normalized_path(&path))
         .collect::<Vec<_>>();
     json!({"operation": tool, "riskClass": risk, "paths": paths, "pathCount": paths.len(),
+        "desktop": desktop_approval_summary(tool, arguments),
         "overwrite": arguments.get("overwrite"), "recursive": arguments.get("recursive"),
         "deleteMode": arguments.get("mode"), "expectedVersion": arguments.get("expectedVersion"),
         "dryRun": arguments.get("dryRun"), "budget": arguments.get("budget"),
         "editCount": edit_count(arguments), "contentBytesEstimate": content_bytes_estimate(arguments),
         "command": command_approval_summary(tool, arguments), "contentRedacted": true})
+}
+
+fn desktop_approval_summary(tool: &str, arguments: &Value) -> Option<Value> {
+    if !matches!(tool, "desktop_observe" | "desktop_control") {
+        return None;
+    }
+    let typed = arguments.get("text").and_then(Value::as_str);
+    Some(json!({
+        "kind": arguments.get("kind"),
+        "action": arguments.get("action"),
+        "label": arguments.get("label"),
+        "loc": arguments.get("loc"),
+        "button": arguments.get("button"),
+        "clicks": arguments.get("clicks"),
+        "direction": arguments.get("direction"),
+        "wheelTimes": arguments.get("wheelTimes"),
+        "shortcut": arguments.get("shortcut"),
+        "windowName": arguments.get("name"),
+        "textLength": typed.map(str::len),
+        "textRedacted": typed.is_some(),
+    }))
 }
 
 fn command_approval_summary(tool: &str, arguments: &Value) -> Option<Value> {

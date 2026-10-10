@@ -232,6 +232,8 @@ impl BudgetTracker {
         saturating_add(&self.counters.bytes_read, amount);
     }
 
+    // Retain MSRV 1.85 compatibility: fetch_update was renamed in Rust 1.99.
+    #[allow(deprecated)]
     fn consume(
         &self,
         counter: &AtomicU64,
@@ -277,6 +279,8 @@ impl BudgetTracker {
     }
 }
 
+// Keep the stable 1.85 atomic API without raising the project's MSRV.
+#[allow(deprecated)]
 fn saturating_add(counter: &AtomicU64, amount: u64) {
     let _ = counter.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
         Some(current.saturating_add(amount))
@@ -340,6 +344,7 @@ impl AdmissionController {
     }
 }
 
+#[allow(deprecated)]
 fn reserve_memory(used: &AtomicU64, limit: u64, amount: u64) -> RuntimeResult<()> {
     used.fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
         current.checked_add(amount).filter(|next| *next <= limit)
@@ -400,6 +405,7 @@ impl IoResourceGovernor {
             })
     }
 
+    #[allow(deprecated)]
     pub fn try_reserve_disk(&self, bytes: u64) -> RuntimeResult<DiskReservation> {
         self.disk_reserved
             .fetch_update(Ordering::AcqRel, Ordering::Acquire, |current| {
