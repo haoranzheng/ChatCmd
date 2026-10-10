@@ -825,8 +825,11 @@ mod tests {
         fs::write(&path, "one").expect("write");
         let first =
             fingerprint_identity(&path, &fs::metadata(&path).expect("metadata")).expect("identity");
-        fs::remove_file(&path).expect("remove");
-        fs::write(&path, "two").expect("replace");
+        // Create the replacement while the original inode is still allocated.
+        // Unlink/recreate may legitimately reuse that inode on Linux.
+        let replacement = directory.path().join("replacement");
+        fs::write(&replacement, "two").expect("write replacement");
+        fs::rename(&replacement, &path).expect("atomically replace");
         let second =
             fingerprint_identity(&path, &fs::metadata(&path).expect("metadata")).expect("identity");
         assert_ne!(first, second);
