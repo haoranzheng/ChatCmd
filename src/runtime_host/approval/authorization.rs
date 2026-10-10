@@ -6,7 +6,8 @@ impl RuntimeHost {
         arguments: &Value,
     ) -> RuntimeResult<()> {
         let scoped_tool = tool.starts_with("fs_") || tool.starts_with("git_")
-            || matches!(tool, "workspace_index_status" | "workspace_index_rebuild");
+            || matches!(tool, "workspace_index_status" | "workspace_index_rebuild")
+            || matches!(tool, "workspace_roots" | "project_context");
         let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
         let desktop_tool = matches!(tool, "desktop_observe" | "desktop_control");
         let capabilities = tool_capabilities(tool);
