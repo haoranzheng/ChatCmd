@@ -50,7 +50,10 @@ impl RuntimeHost {
             None
         };
         let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
-        if filesystem_tool || tool.starts_with("git_") {
+        if filesystem_tool
+            || tool.starts_with("git_")
+            || matches!(tool, "workspace_roots" | "project_context")
+        {
             self.require_workspace_access(&context, tool, &arguments)
                 .await?;
         }

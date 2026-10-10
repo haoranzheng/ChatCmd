@@ -157,6 +157,17 @@ async fn authorized_write_is_scoped_and_revocation_blocks_subsequent_writes() {
         "untouched"
     );
     bind(state.clone(), &task, &project_id, "restricted").await;
+    for tool in ["workspace_roots", "project_context"] {
+        let error = host
+            .dispatch(
+                tool,
+                context(&task, &agent, tool, "restricted-metadata"),
+                json!({}),
+            )
+            .await
+            .expect_err("restricted tasks must not read workspace metadata or rules");
+        assert_eq!(error.code, "policy_denied");
+    }
     let denied = host
         .dispatch(
             "fs_replace_text",

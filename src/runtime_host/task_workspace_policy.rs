@@ -176,6 +176,11 @@ impl RuntimeHost {
 }
 
 fn mutation_paths(tool: &str, args: &Value, root: &Path) -> RuntimeResult<Vec<PathBuf>> {
+    // Workspace metadata and project rule reads must respect restricted tasks.
+    // ProjectContextService separately validates every requested target against root.
+    if matches!(tool, "workspace_roots" | "project_context") {
+        return Ok(vec![root.to_path_buf()]);
+    }
     if tool.starts_with("git_") {
         return Ok(vec![resolve_target(
             root,
