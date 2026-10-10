@@ -443,7 +443,10 @@ async fn invalid_extra_folder_does_not_modify_existing_binding() {
     assert_eq!(binding.0["accessMode"], "readOnly");
     assert_eq!(binding.0["additionalProjectIds"], json!([]));
     let agent: String = sqlx::query_scalar("SELECT agent_id FROM tasks WHERE id=?")
-        .bind(&task).fetch_one(state.repository.pool()).await.expect("agent");
+        .bind(&task)
+        .fetch_one(state.repository.pool())
+        .await
+        .expect("agent");
     assert!(
         host.require_workspace_access(
             &context(&task, &agent, "fs_read_text", "primary-still-readable"),
@@ -454,4 +457,3 @@ async fn invalid_extra_folder_does_not_modify_existing_binding() {
         .is_ok()
     );
 }
-
