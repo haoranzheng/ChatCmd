@@ -32,11 +32,10 @@ pub(super) async fn seed_catalog(
                 "git_commit",
                 "process_kill",
                 "shell_close",
+                "desktop_control",
             ]
             .contains(&name.as_str())
             {
-                vec![ToolCapability::Destructive]
-            } else if name == "desktop_control" {
                 vec![ToolCapability::Destructive]
             } else if name.starts_with("blob_")
                 || name.starts_with("fs_write")
