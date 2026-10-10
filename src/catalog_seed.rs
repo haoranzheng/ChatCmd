@@ -9,6 +9,7 @@ pub(super) async fn seed_catalog(
 ) -> Result<(), chatcmd_core::StorageError> {
     let groups = vec![
         tool_group("group-device", "device", "Device", 10),
+        tool_group("group-desktop", "desktop", "Windows Desktop", 15),
         tool_group("group-terminal", "terminal", "Terminal", 20),
         tool_group("group-files", "files", "Files & workspace", 30),
         tool_group("group-git", "git", "Git", 40),
@@ -35,6 +36,8 @@ pub(super) async fn seed_catalog(
             .contains(&name.as_str())
             {
                 vec![ToolCapability::Destructive]
+            } else if name == "desktop_control" {
+                vec![ToolCapability::Destructive]
             } else if name.starts_with("blob_")
                 || name.starts_with("fs_write")
                 || matches!(name.as_str(), "fs_replace_text" | "fs_apply_edits")
@@ -48,7 +51,7 @@ pub(super) async fn seed_catalog(
         .collect::<Vec<_>>();
     let safe_ids = tools
         .iter()
-        .filter(|tool| !tool.capabilities.contains(&ToolCapability::Destructive))
+        .filter(|tool| !tool.key.starts_with("desktop_") && !tool.capabilities.contains(&ToolCapability::Destructive))
         .map(|tool| tool.id.clone())
         .collect();
     let presets = vec![ToolPreset {
@@ -95,7 +98,9 @@ fn tool_group(id: &str, key: &str, display_name: &str, sort_order: i32) -> ToolG
 }
 
 fn tool_group_id(name: &str) -> &'static str {
-    if name.starts_with("device_") {
+    if name.starts_with("desktop_") {
+        "group-desktop"
+    } else if name.starts_with("device_") {
         "group-device"
     } else if name.starts_with("shell_") {
         "group-terminal"

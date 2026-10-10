@@ -36,6 +36,16 @@ macro_rules! tool_methods {
 
 tool_methods!(
     (
+        desktop_observe,
+        DesktopObserveArgs,
+        "Observe Windows desktop using the approved local Windows-MCP Snapshot or Screenshot. Optional kind: snapshot (default) or screenshot. Requires local approval every call, even Allow all."
+    ),
+    (
+        desktop_control,
+        DesktopControlArgs,
+        "Perform one approved Windows GUI action: action click|type|scroll|shortcut|switch_window. click/type require loc or label; type text, shortcut shortcut, switch_window name. No shell, registry, files, process or app launch. Always requires local approval."
+    ),
+    (
         device_list,
         NoArgs,
         "List available execution devices. No tool-specific fields."

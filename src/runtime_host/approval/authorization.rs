@@ -8,6 +8,7 @@ impl RuntimeHost {
         let scoped_tool = tool.starts_with("fs_") || tool.starts_with("git_")
             || matches!(tool, "workspace_index_status" | "workspace_index_rebuild");
         let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
+        let desktop_tool = matches!(tool, "desktop_observe" | "desktop_control");
         let capabilities = tool_capabilities(tool);
         if capabilities.is_permission_change() {
             return Err(RuntimeError::new(
@@ -34,14 +35,14 @@ impl RuntimeHost {
         if scoped_tool {
             self.require_workspace_access(context, tool, arguments).await?;
         }
-        if execution_mode == chatcmd_core::ExecutionMode::Allow && !writes_workspace {
+        if execution_mode == chatcmd_core::ExecutionMode::Allow && !writes_workspace && !desktop_tool {
             return Ok(());
         }
 
         let resolved_arguments = self
             .resolve_approval_paths(context, tool, arguments)
             .await?;
-        if capabilities.risk_class.is_safe_read()
+        if !desktop_tool && capabilities.risk_class.is_safe_read()
             && self
                 .consume_safe_read_grant(context, tool, &resolved_arguments)
                 .await?
@@ -51,7 +52,7 @@ impl RuntimeHost {
 
         let approval_id = context.request_id.clone();
         let turn_id = context.turn_id.as_deref().unwrap_or_default();
-        let grant_preview = if capabilities.risk_class.is_safe_read() {
+        let grant_preview = if capabilities.risk_class.is_safe_read() && !desktop_tool {
             Some(self.safe_read_grant_preview(context, tool).await?)
         } else {
             None
@@ -128,7 +129,7 @@ impl RuntimeHost {
         .await?;
         self.wait_for_approval(context, &task_id, &approval_id)
             .await?;
-        self.recheck_approved_execution(&mode_task_id, &task_id, &approval_id, &operation_digest)
+        self.recheck_approved_execution(&mode_task_id, &task_id, &approval_id, &operation_digest, desktop_tool)
             .await
     }
 
@@ -138,6 +139,7 @@ impl RuntimeHost {
         task_id: &TaskId,
         approval_id: &str,
         operation_digest: &str,
+        desktop_tool: bool,
     ) -> RuntimeResult<()> {
         let mode = self
             .repository
@@ -150,7 +152,7 @@ impl RuntimeHost {
                 "conversation access mode was revoked before dispatch",
             ));
         }
-        if mode == chatcmd_core::ExecutionMode::Allow {
+        if mode == chatcmd_core::ExecutionMode::Allow && !desktop_tool {
             return Ok(());
         }
         let request_json = sqlx::query_scalar::<_, String>(

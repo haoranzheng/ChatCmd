@@ -107,6 +107,13 @@ impl RuntimeHost {
         }
 
         match tool {
+            "desktop_observe" | "desktop_control" => {
+                let (enabled, port) = crate::desktop_bridge::config(self.repository.pool()).await?;
+                if !enabled {
+                    return Err(RuntimeError::new("desktop_disabled", "Enable Windows desktop integration in ChatCMD Security settings"));
+                }
+                crate::desktop_bridge::invoke(port, tool, &arguments).await
+            }
             "device_list" => value(vec![self.local_device()]),
             "device_get" => {
                 let input: DeviceGet = parse(arguments)?;
