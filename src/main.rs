@@ -6,6 +6,7 @@
 #![allow(clippy::result_large_err)]
 
 mod api;
+mod desktop_bridge;
 mod catalog_seed;
 mod chatgpt_message;
 mod chatgpt_queue;
