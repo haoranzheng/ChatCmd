@@ -315,3 +315,47 @@ async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
         .unwrap()
     );
 }
+
+#[tokio::test]
+async fn trusted_desktop_control_skips_individual_approval_only_when_enabled() {
+    let (host, agent_id, _temp) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "desktop-auto-approval").await;
+    let task_id = context.task_id.as_deref().expect("task");
+    sqlx::query(
+        "INSERT INTO settings(key,value_json,updated_at_ms) VALUES('desktop_enabled','true',0)",
+    )
+    .execute(host.repository.pool())
+    .await
+    .expect("enable desktop bridge");
+    sqlx::query(
+        "INSERT INTO settings(key,value_json,updated_at_ms) VALUES('desktop_port','8000',0)",
+    )
+    .execute(host.repository.pool())
+    .await
+    .expect("set port");
+    sqlx::query(
+        "INSERT INTO desktop_task_trust(task_id,agent_id,scope,port,expires_at_ms,updated_at_ms)
+         VALUES(?,?,'control',8000,?,?)",
+    )
+    .bind(task_id)
+    .bind(&agent_id)
+    .bind(now_ms() + 60_000)
+    .bind(now_ms())
+    .execute(host.repository.pool())
+    .await
+    .expect("trust current conversation");
+    host.authorize_execution(&context, "desktop_control", &json!({"action":"scroll"}))
+        .await
+        .expect("trusted desktop control must not prompt");
+    let approvals: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM approvals WHERE task_id=?")
+        .bind(task_id)
+        .fetch_one(host.repository.pool())
+        .await
+        .expect("count approvals");
+    assert_eq!(approvals, 0);
+    sqlx::query("UPDATE settings SET value_json='false' WHERE key='desktop_enabled'")
+        .execute(host.repository.pool())
+        .await
+        .expect("disable integration");
+    assert!(!crate::desktop_bridge::config(host.repository.pool()).await.unwrap().0);
+}

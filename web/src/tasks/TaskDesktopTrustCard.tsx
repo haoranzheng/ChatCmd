@@ -19,6 +19,16 @@ export function TaskDesktopTrustCard({ taskId }: { taskId: string }) {
     return () => { active = false; };
   }, [taskId]);
 
+  useEffect(() => {
+    if (!trust?.active || trust.expiresAtMs === null) return;
+    const timeout = window.setTimeout(() => {
+      setTrust((current) => current?.expiresAtMs === trust.expiresAtMs
+        ? { ...current, active: false, scope: 'none', expiresAtMs: null }
+        : current);
+    }, Math.min(60000, Math.max(0, trust.expiresAtMs - Date.now())));
+    return () => window.clearTimeout(timeout);
+  }, [trust]);
+
   async function grant() {
     if (busy) return;
     const text = scope === 'control'
