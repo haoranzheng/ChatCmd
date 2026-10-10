@@ -357,5 +357,10 @@ async fn trusted_desktop_control_skips_individual_approval_only_when_enabled() {
         .execute(host.repository.pool())
         .await
         .expect("disable integration");
-    assert!(!crate::desktop_bridge::config(host.repository.pool()).await.unwrap().0);
+    assert!(
+        !crate::desktop_bridge::config(host.repository.pool())
+            .await
+            .unwrap()
+            .0
+    );
 }
