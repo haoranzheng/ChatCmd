@@ -148,7 +148,10 @@ pub(super) async fn update_workspace_project(
         sqlx::query("WITH RECURSIVE affected(id) AS (SELECT task_id FROM task_workspace_access WHERE project_id=? UNION SELECT task_id FROM task_workspace_extra_roots WHERE project_id=? UNION SELECT child_task_id FROM subagent_runs JOIN affected ON parent_task_id=affected.id WHERE child_task_id IS NOT NULL) UPDATE approval_grants SET state='revoked',updated_at_ms=? WHERE task_id IN (SELECT id FROM affected) AND state='active'")
             .bind(&id).bind(&id).bind(now).execute(&mut *transaction).await.map_err(db_problem)?;
         sqlx::query("DELETE FROM task_workspace_extra_roots WHERE project_id=?")
-            .bind(&id).execute(&mut *transaction).await.map_err(db_problem)?;
+            .bind(&id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(db_problem)?;
         let task_rows =
             sqlx::query("SELECT id,project_folder FROM tasks WHERE project_folder IS NOT NULL")
                 .fetch_all(&mut *transaction)
@@ -266,7 +269,10 @@ pub(super) async fn delete_workspace_project(
     sqlx::query("WITH RECURSIVE affected(id) AS (SELECT task_id FROM task_workspace_access WHERE project_id=? UNION SELECT task_id FROM task_workspace_extra_roots WHERE project_id=? UNION SELECT child_task_id FROM subagent_runs JOIN affected ON parent_task_id=affected.id WHERE child_task_id IS NOT NULL) UPDATE approval_grants SET state='revoked',updated_at_ms=? WHERE task_id IN (SELECT id FROM affected) AND state='active'")
         .bind(&id).bind(&id).bind(now).execute(state.repository.pool()).await.map_err(db_problem)?;
     sqlx::query("DELETE FROM task_workspace_extra_roots WHERE project_id=?")
-        .bind(&id).execute(state.repository.pool()).await.map_err(db_problem)?;
+        .bind(&id)
+        .execute(state.repository.pool())
+        .await
+        .map_err(db_problem)?;
     sqlx::query("UPDATE task_workspace_access SET access_mode='restricted', project_id=NULL, updated_at_ms=? WHERE project_id=?")
         .bind(now).bind(&id).execute(state.repository.pool()).await.map_err(db_problem)?;
     sqlx::query("UPDATE approval_grants SET state='revoked',updated_at_ms=? WHERE task_id IN (SELECT task_id FROM task_workspace_access WHERE project_id IS NULL) AND state='active'")

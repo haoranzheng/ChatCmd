@@ -1,6 +1,9 @@
 //! Authenticated, local-UI-only task workspace binding.
 //! An MCP caller cannot mint or broaden this authority.
-use std::{collections::HashSet, path::{Path as FsPath, PathBuf}};
+use std::{
+    collections::HashSet,
+    path::{Path as FsPath, PathBuf},
+};
 
 use axum::{
     Json,
@@ -41,8 +44,13 @@ pub(super) async fn task_workspace(
             .fetch_optional(state.repository.pool())
             .await
             .map_err(db_problem)?;
-    let additional_project_ids = sqlx::query_scalar::<_, String>("SELECT project_id FROM task_workspace_extra_roots WHERE task_id=? ORDER BY project_id")
-        .bind(&id).fetch_all(state.repository.pool()).await.map_err(db_problem)?;
+    let additional_project_ids = sqlx::query_scalar::<_, String>(
+        "SELECT project_id FROM task_workspace_extra_roots WHERE task_id=? ORDER BY project_id",
+    )
+    .bind(&id)
+    .fetch_all(state.repository.pool())
+    .await
+    .map_err(db_problem)?;
     Ok(Json(json!({
         "additionalProjectIds": additional_project_ids,
         "taskId": id,
@@ -69,12 +77,24 @@ pub(super) async fn set_task_workspace(
         ));
     }
     if change.additional_project_ids.len() > 15 {
-        return Err(Problem::new(StatusCode::BAD_REQUEST, "Too many workspace roots", "Select no more than 15 additional folders."));
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "Too many workspace roots",
+            "Select no more than 15 additional folders.",
+        ));
     }
     let mut selected = HashSet::new();
     selected.insert(change.project_id.as_str());
-    if !change.additional_project_ids.iter().all(|id| selected.insert(id.as_str())) {
-        return Err(Problem::new(StatusCode::BAD_REQUEST, "Duplicate workspace roots", "Choose distinct saved projects."));
+    if !change
+        .additional_project_ids
+        .iter()
+        .all(|id| selected.insert(id.as_str()))
+    {
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "Duplicate workspace roots",
+            "Choose distinct saved projects.",
+        ));
     }
     let row = sqlx::query("SELECT path FROM workspace_projects WHERE id=?")
         .bind(&change.project_id)
@@ -94,11 +114,24 @@ pub(super) async fn set_task_workspace(
     let mut canonical_roots = HashSet::from([canonical.clone()]);
     for project_id in &change.additional_project_ids {
         let row = sqlx::query("SELECT path FROM workspace_projects WHERE id=?")
-            .bind(project_id).fetch_optional(state.repository.pool()).await.map_err(db_problem)?
-            .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "Workspace project not found", "Select an existing saved folder."))?;
+            .bind(project_id)
+            .fetch_optional(state.repository.pool())
+            .await
+            .map_err(db_problem)?
+            .ok_or_else(|| {
+                Problem::new(
+                    StatusCode::NOT_FOUND,
+                    "Workspace project not found",
+                    "Select an existing saved folder.",
+                )
+            })?;
         let root = validate_workspace_root(row.get::<&str, _>("path"))?;
         if !canonical_roots.insert(root.clone()) {
-            return Err(Problem::new(StatusCode::BAD_REQUEST, "Duplicate workspace roots", "Selected projects resolve to the same folder."));
+            return Err(Problem::new(
+                StatusCode::BAD_REQUEST,
+                "Duplicate workspace roots",
+                "Selected projects resolve to the same folder.",
+            ));
         }
         additional_roots.push((project_id, root.to_string_lossy().into_owned()));
     }
@@ -122,7 +155,10 @@ pub(super) async fn set_task_workspace(
         .bind(&id).bind(&change.project_id).bind(&change.access_mode).bind(now)
         .execute(&mut *tx).await.map_err(db_problem)?;
     sqlx::query("DELETE FROM task_workspace_extra_roots WHERE task_id=?")
-        .bind(&id).execute(&mut *tx).await.map_err(db_problem)?;
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_problem)?;
     for (project_id, root) in &additional_roots {
         sqlx::query("INSERT INTO task_workspace_extra_roots(task_id,project_id,authorized_root) VALUES(?,?,?)")
             .bind(&id).bind(project_id).bind(root).execute(&mut *tx).await.map_err(db_problem)?;

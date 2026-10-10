@@ -54,11 +54,13 @@ impl RuntimeHost {
             self.require_workspace_access(&context, tool, &arguments)
                 .await?;
         }
-        let additional_roots = if filesystem_tool || tool.starts_with("git_") || tool == "workspace_roots" {
-            self.additional_workspace_roots(context.task_id.as_deref()).await?
-        } else {
-            Vec::new()
-        };
+        let additional_roots =
+            if filesystem_tool || tool.starts_with("git_") || tool == "workspace_roots" {
+                self.additional_workspace_roots(context.task_id.as_deref())
+                    .await?
+            } else {
+                Vec::new()
+            };
         let mut task_path_scopes = if writes_workspace {
             Vec::new()
         } else if filesystem_tool
