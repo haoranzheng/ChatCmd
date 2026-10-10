@@ -84,14 +84,16 @@ pub(super) async fn set_task_desktop_trust(
             "Enable Windows-MCP in Security settings before trusting the conversation.",
         ));
     }
-    let identity: Option<String> = sqlx::query_scalar(
-        "SELECT conversation_scope_hash FROM tasks WHERE id=?",
-    )
-    .bind(&id)
-    .fetch_one(state.repository.pool())
-    .await
-    .map_err(db_problem)?;
-    if !identity.as_deref().is_some_and(|scope| !scope.trim().is_empty()) {
+    let identity: Option<String> =
+        sqlx::query_scalar("SELECT conversation_scope_hash FROM tasks WHERE id=?")
+            .bind(&id)
+            .fetch_one(state.repository.pool())
+            .await
+            .map_err(db_problem)?;
+    if !identity
+        .as_deref()
+        .is_some_and(|scope| !scope.trim().is_empty())
+    {
         return Err(Problem::new(
             StatusCode::CONFLICT,
             "Conversation identity unbound",
