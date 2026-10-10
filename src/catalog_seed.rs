@@ -51,7 +51,10 @@ pub(super) async fn seed_catalog(
         .collect::<Vec<_>>();
     let safe_ids = tools
         .iter()
-        .filter(|tool| !tool.key.starts_with("desktop_") && !tool.capabilities.contains(&ToolCapability::Destructive))
+        .filter(|tool| {
+            !tool.key.starts_with("desktop_")
+                && !tool.capabilities.contains(&ToolCapability::Destructive)
+        })
         .map(|tool| tool.id.clone())
         .collect();
     let presets = vec![ToolPreset {

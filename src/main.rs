@@ -6,11 +6,11 @@
 #![allow(clippy::result_large_err)]
 
 mod api;
-mod desktop_bridge;
 mod catalog_seed;
 mod chatgpt_message;
 mod chatgpt_queue;
 mod chatgpt_transcript;
+mod desktop_bridge;
 #[cfg(all(not(debug_assertions), any(target_os = "windows", target_os = "macos")))]
 mod desktop_tray;
 #[cfg(feature = "embedded-web")]

@@ -110,7 +110,10 @@ impl RuntimeHost {
             "desktop_observe" | "desktop_control" => {
                 let (enabled, port) = crate::desktop_bridge::config(self.repository.pool()).await?;
                 if !enabled {
-                    return Err(RuntimeError::new("desktop_disabled", "Enable Windows desktop integration in ChatCMD Security settings"));
+                    return Err(RuntimeError::new(
+                        "desktop_disabled",
+                        "Enable Windows desktop integration in ChatCMD Security settings",
+                    ));
                 }
                 crate::desktop_bridge::invoke(port, tool, &arguments).await
             }
