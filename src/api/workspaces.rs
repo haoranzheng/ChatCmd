@@ -262,9 +262,9 @@ pub(super) async fn delete_workspace_project(
     // Revoke only this project's root tasks and descendant grants before
     // nulling the project ID; other tombstones must remain unaffected.
     sqlx::query("WITH RECURSIVE affected(id) AS (SELECT task_id FROM task_workspace_access WHERE project_id=? UNION SELECT task_id FROM task_workspace_extra_roots WHERE project_id=? UNION SELECT child_task_id FROM subagent_runs JOIN affected ON parent_task_id=affected.id WHERE child_task_id IS NOT NULL) UPDATE approvals SET state='cancelled',decision_json=json_object('reason','workspace project removed'),resolved_at_ms=? WHERE task_id IN (SELECT id FROM affected) AND state='pending'")
-        .bind(&id).bind(now).execute(state.repository.pool()).await.map_err(db_problem)?;
+        .bind(&id).bind(&id).bind(now).execute(state.repository.pool()).await.map_err(db_problem)?;
     sqlx::query("WITH RECURSIVE affected(id) AS (SELECT task_id FROM task_workspace_access WHERE project_id=? UNION SELECT task_id FROM task_workspace_extra_roots WHERE project_id=? UNION SELECT child_task_id FROM subagent_runs JOIN affected ON parent_task_id=affected.id WHERE child_task_id IS NOT NULL) UPDATE approval_grants SET state='revoked',updated_at_ms=? WHERE task_id IN (SELECT id FROM affected) AND state='active'")
-        .bind(&id).bind(now).execute(state.repository.pool()).await.map_err(db_problem)?;
+        .bind(&id).bind(&id).bind(now).execute(state.repository.pool()).await.map_err(db_problem)?;
     sqlx::query("DELETE FROM task_workspace_extra_roots WHERE project_id=?")
         .bind(&id).execute(state.repository.pool()).await.map_err(db_problem)?;
     sqlx::query("UPDATE task_workspace_access SET access_mode='restricted', project_id=NULL, updated_at_ms=? WHERE project_id=?")

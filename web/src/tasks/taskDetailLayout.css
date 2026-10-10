@@ -60,3 +60,19 @@
   background: var(--surface, #202020);
 }
 .task-access-card small { overflow-wrap: anywhere; }
+
+.task-extra-roots {
+  margin: 8px 0 12px;
+  border: 1px solid var(--border, #555);
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 0;
+}
+.task-extra-roots legend { padding: 0 4px; font-size: 0.85em; }
+.task-extra-root { display: flex; gap: 8px; align-items: flex-start; padding: 7px 2px; cursor: pointer; }
+.task-extra-root + .task-extra-root { border-top: 1px solid var(--border, #555); }
+.task-extra-root input { flex: 0 0 auto; margin-top: 3px; }
+.task-extra-root span { min-width: 0; overflow-wrap: anywhere; }
+.task-extra-root strong, .task-extra-root small { display: block; }
+.task-extra-root small { opacity: 0.8; }
+.task-add-root { margin: 4px 0 12px; }

@@ -335,3 +335,82 @@ async fn removing_a_saved_project_keeps_a_restrictive_tombstone() {
         .expect_err("project deletion revokes reads");
     assert_eq!(error.code, "policy_denied");
 }
+
+#[tokio::test]
+async fn multiple_authorized_roots_allow_distinct_folders_but_not_a_sibling() {
+    let primary = tempfile::tempdir().expect("primary");
+    let secondary = tempfile::tempdir().expect("secondary");
+    let sibling = tempfile::tempdir().expect("unselected sibling");
+    let (host, state, task, primary_id, _db) = fixture(primary.path()).await;
+    let agent: String = sqlx::query_scalar("SELECT agent_id FROM tasks WHERE id=?")
+        .bind(&task).fetch_one(state.repository.pool()).await.expect("agent");
+    let secondary_id = "secondary-test-project";
+    let secondary_root = secondary.path().canonicalize().expect("secondary canonical");
+    sqlx::query("INSERT INTO workspace_projects(id,name,path,canonical_path,created_at_ms,updated_at_ms) VALUES(?,?,?, ?,0,0)")
+        .bind(secondary_id).bind("Second root")
+        .bind(secondary_root.to_string_lossy().as_ref())
+        .bind(secondary_root.to_string_lossy().as_ref())
+        .execute(state.repository.pool()).await.expect("secondary row");
+    let changed = set_task_workspace(
+        State(state.clone()), AxumPath(task.clone()),
+        Json(TaskWorkspaceChange {
+            project_id: primary_id.clone(),
+            access_mode: "readWrite".to_owned(),
+            additional_project_ids: vec![secondary_id.to_owned()],
+        }),
+    ).await.expect("authorize two roots");
+    assert_eq!(changed.0["additionalProjectIds"], json!([secondary_id]));
+    let roots = host.dispatch("workspace_roots",
+        context(&task, &agent, "workspace_roots", "multi-root-list"),
+        json!({})).await.expect("workspace roots");
+    let roots = roots.as_array().expect("array of roots");
+    assert!(roots.contains(&json!(primary.path().canonicalize().expect("primary root"))));
+    assert!(roots.contains(&json!(secondary_root)));
+    let secondary_file = secondary.path().join("two.txt");
+    std::fs::write(&secondary_file, "start").expect("test file");
+    host.dispatch("fs_replace_text",
+        context(&task, &agent, "fs_replace_text", "write-secondary"),
+        json!({"path": secondary_file, "oldText": "start", "newText": "done"}))
+        .await.expect("write authorized secondary");
+    assert_eq!(std::fs::read_to_string(&secondary_file).expect("after"), "done");
+    let forbidden = sibling.path().join("outside.txt");
+    std::fs::write(&forbidden, "safe").expect("test outside");
+    let denied = host.require_workspace_access(
+        &context(&task, &agent, "fs_read_text", "outside"), "fs_read_text",
+        &json!({"path": forbidden})).await.expect_err("outside denied");
+    assert_eq!(denied.code, "path_outside_allowed_scope");
+
+    bind(state.clone(), &task, &primary_id, "readOnly").await;
+    let result = task_workspace(State(state.clone()), AxumPath(task.clone())).await.expect("saved");
+    assert_eq!(result.0["additionalProjectIds"], json!([]));
+    let denied = host.require_workspace_access(
+        &context(&task, &agent, "fs_replace_text", "revoked-secondary"), "fs_replace_text",
+        &json!({"path": secondary_file})).await.expect_err("old extra revoked");
+    assert_eq!(denied.code, "permission_change_requires_user");
+}
+
+#[tokio::test]
+async fn invalid_extra_folder_does_not_modify_existing_binding() {
+    let primary = tempfile::tempdir().expect("primary");
+    let (host, state, task, primary_id, _db) = fixture(primary.path()).await;
+    bind(state.clone(), &task, &primary_id, "readOnly").await;
+    let invalid = set_task_workspace(
+        State(state.clone()), AxumPath(task.clone()),
+        Json(TaskWorkspaceChange {
+            project_id: primary_id.clone(),
+            access_mode: "readWrite".to_owned(),
+            additional_project_ids: vec!["project-does-not-exist".to_owned()],
+        }),
+    ).await;
+    assert!(invalid.is_err());
+    let binding = task_workspace(State(state.clone()), AxumPath(task.clone())).await.expect("still bound");
+    assert_eq!(binding.0["accessMode"], "readOnly");
+    assert_eq!(binding.0["additionalProjectIds"], json!([]));
+    let agent: String = sqlx::query_scalar("SELECT agent_id FROM tasks WHERE id=?")
+        .bind(&task).fetch_one(state.repository.pool()).await.expect("agent");
+    assert!(host.require_workspace_access(
+        &context(&task, &agent, "fs_read_text", "primary-still-readable"),
+        "fs_read_text", &json!({"path":primary.path().join("test.txt")})
+    ).await.is_ok());
+}
+
