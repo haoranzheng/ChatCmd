@@ -81,12 +81,19 @@ impl RuntimeHost {
         tool: &str,
         arguments: &Value,
     ) -> RuntimeResult<()> {
-        let task_id = context.task_id.as_deref().ok_or_else(|| {
-            RuntimeError::new(
-                "project_folder_required",
-                "A task identity is required to access a workspace.",
-            )
-        })?;
+        // Without a task, workspace_roots must return an empty list rather
+        // than revealing the process-wide configured workspace or erroring.
+        // All other workspace access still requires a real task identity.
+        let Some(task_id) = context.task_id.as_deref() else {
+            return if tool == "workspace_roots" {
+                Ok(())
+            } else {
+                Err(RuntimeError::new(
+                    "project_folder_required",
+                    "A task identity is required to access a workspace.",
+                ))
+            };
+        };
         let row = sqlx::query(
             "SELECT a.access_mode,a.project_id,t.project_folder,p.path AS project_path FROM task_workspace_access a JOIN tasks t ON t.id=a.task_id LEFT JOIN workspace_projects p ON p.id=a.project_id WHERE a.task_id=?"
         ).bind(task_id).fetch_optional(self.repository.pool()).await
