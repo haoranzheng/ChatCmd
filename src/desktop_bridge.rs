@@ -43,12 +43,14 @@ pub(crate) async fn is_trusted(
     }
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |duration| i64::try_from(duration.as_millis()).unwrap_or(i64::MAX));
+        .map_or(0, |duration| {
+            i64::try_from(duration.as_millis()).unwrap_or(i64::MAX)
+        });
     let exists: i64 = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM desktop_task_trust d JOIN tasks t ON t.id=d.task_id
          WHERE d.task_id=? AND d.agent_id=? AND t.agent_id=d.agent_id
          AND d.port=? AND d.expires_at_ms>?
-         AND (d.scope='control' OR (?='desktop_observe' AND d.scope='observe')))"
+         AND (d.scope='control' OR (?='desktop_observe' AND d.scope='observe')))",
     )
     .bind(task_id)
     .bind(agent_id)

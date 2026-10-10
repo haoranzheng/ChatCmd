@@ -170,7 +170,10 @@ pub(super) async fn set_task_workspace(
         .bind(&id).bind(now).execute(&mut *tx).await.map_err(db_problem)?;
     // Changing workspace authority must also revoke unattended desktop access.
     sqlx::query("DELETE FROM desktop_task_trust WHERE task_id=?")
-        .bind(&id).execute(&mut *tx).await.map_err(db_problem)?;
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_problem)?;
     // Always retain per-operation approval, even if the previous task policy was allowAll.
     sqlx::query("INSERT INTO task_execution_modes(task_id,mode,updated_at_ms) VALUES(?,'approval',?) ON CONFLICT(task_id) DO UPDATE SET mode='approval',updated_at_ms=excluded.updated_at_ms")
         .bind(&id).bind(now).execute(&mut *tx).await.map_err(db_problem)?;
