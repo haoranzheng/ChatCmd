@@ -91,3 +91,8 @@ Desktop trust does **not** authorize shell commands, managed file writes,
 Windows-MCP `PowerShell`, registry or arbitrary process tools. Nonetheless
 trusted screen control can modify data through GUI applications. Use it only
 for trusted conversations and monitor sensitive screens.
+
+
+## Local Windows x64 packaging
+
+Preview builds can now be packaged locally instead of consuming GitHub Release build time. See [Local Windows preview build](local-windows-preview-build.md). Ordinary CI retains platform tests and the GitHub Windows Release ZIP is optional on explicit workflow dispatch.

@@ -8,6 +8,12 @@ on:
       - 'docs/workspace-write-authorization.md'
       - '.github/workflows/workspace-binding-ci.yml'
   workflow_dispatch:
+    inputs:
+      package_windows_preview:
+        description: 'Run optional GitHub release packaging (default is local build)'
+        required: false
+        default: false
+        type: boolean
 permissions:
   contents: read
 concurrency:
@@ -72,9 +78,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - run: cargo build --bin chat-cmd-client
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.package_windows_preview
       - name: Build portable Windows x64 preview
-        if: runner.os == 'Windows'
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.package_windows_preview
         shell: pwsh
         run: |
           npm run build --prefix web
@@ -92,7 +98,7 @@ jobs:
           Set-Content 'staging/SHA256SUMS.txt' -Value "$hash  ChatCMD.exe" -Encoding ascii
           Compress-Archive -Path 'staging/*' -DestinationPath 'ChatCMD-windows-x64-workspace-preview.zip'
       - uses: actions/upload-artifact@v4
-        if: runner.os == 'Windows' && success()
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && inputs.package_windows_preview && success()
         with:
           name: ChatCMD-windows-x64-workspace-preview
           path: ChatCMD-windows-x64-workspace-preview.zip
