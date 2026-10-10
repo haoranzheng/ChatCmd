@@ -197,3 +197,36 @@ async fn nested_child_uses_root_execution_policy() {
         .expect_err("root deny applies");
     assert_eq!(error.code, "policy_denied");
 }
+
+#[tokio::test]
+async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
+    let (host, agent_id, _temp) = user_message_tests::test_host().await;
+    let task = task_context(&host, &agent_id, "desktop-trust").await;
+    let task_id = task.task_id.as_deref().expect("task id");
+    let second = task_context(&host, &agent_id, "desktop-untrusted").await;
+    let expiry = now_ms() + 60_000;
+    sqlx::query("INSERT INTO desktop_task_trust(task_id,agent_id,scope,port,expires_at_ms,updated_at_ms)
+        VALUES(?,?,'observe',8000,?,?)")
+        .bind(task_id).bind(&agent_id).bind(expiry).bind(now_ms())
+        .execute(host.repository.pool()).await.expect("insert local-only trust");
+    assert!(crate::desktop_bridge::is_trusted(host.repository.pool(), task_id, &agent_id,
+        "desktop_observe", 8000).await.expect("observe trust"));
+    assert!(!crate::desktop_bridge::is_trusted(host.repository.pool(), task_id, &agent_id,
+        "desktop_control", 8000).await.expect("control denied"));
+    assert!(!crate::desktop_bridge::is_trusted(host.repository.pool(), task_id, &agent_id,
+        "desktop_observe", 8001).await.expect("different port denied"));
+    assert!(!crate::desktop_bridge::is_trusted(host.repository.pool(), second.task_id.as_deref().unwrap(),
+        &agent_id, "desktop_observe", 8000).await.expect("other task denied"));
+    assert!(!crate::desktop_bridge::is_trusted(host.repository.pool(), task_id, "wrong-agent",
+        "desktop_observe", 8000).await.expect("wrong agent denied"));
+    assert!(!crate::desktop_bridge::is_trusted(host.repository.pool(), task_id, &agent_id,
+        "shell_create", 8000).await.expect("non-desktop tool denied"));
+    sqlx::query("UPDATE desktop_task_trust SET scope='control' WHERE task_id=?")
+        .bind(task_id).execute(host.repository.pool()).await.expect("scope upgrade");
+    assert!(crate::desktop_bridge::is_trusted(host.repository.pool(), task_id, &agent_id,
+        "desktop_control", 8000).await.unwrap());
+    sqlx::query("UPDATE desktop_task_trust SET expires_at_ms=0 WHERE task_id=?")
+        .bind(task_id).execute(host.repository.pool()).await.expect("expire");
+    assert!(!crate::desktop_bridge::is_trusted(host.repository.pool(), task_id, &agent_id,
+        "desktop_observe", 8000).await.unwrap());
+}

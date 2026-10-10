@@ -7,6 +7,8 @@ export class ApiError extends Error {
   constructor(message: string, public status?: number, public problem?: ProblemDetails) { super(message); this.name = 'ApiError'; }
 }
 
+export interface DesktopTrust { taskId: string; active: boolean; scope: 'none' | 'observe' | 'control'; expiresAtMs: number | null; port?: number }
+export interface DesktopHealth { enabled:boolean; connected:boolean; tools:string[]; checkedAtMs:number; error?:string; missingTools?:string[]; repairHints:string[]; checks:{launcherFound:boolean;portListening:boolean|null} }
 export interface ElevationStatus { supported: boolean; elevated: boolean }
 export interface AuthStatus { configured: boolean; authenticated: boolean; idleTimeoutSeconds: number }
 export interface DatabaseDiagnostics { path: string; tableCount: number; totalRows: number; fileSizeBytes: number; pageCount: number; pageSizeBytes: number; freePageCount: number; usedSizeBytes: number; tables: Array<{ name: string; rowCount: number }> }
@@ -101,7 +103,10 @@ export const api = {
   workspaceProjects: () => request<WorkspaceProject[]>('/api/local/workspaces/projects'),
   desktopConfig: () => request<{enabled:boolean;port:number;endpoint:string}>('/api/local/desktop/config'),
   setDesktopConfig: (input:{enabled:boolean;port:number}) => request<{enabled:boolean;port:number;endpoint:string}>('/api/local/desktop/config',{method:'PUT',body:json(input)}),
-  desktopStatus: () => request<{enabled:boolean;connected:boolean;tools:string[];error?:string}>('/api/local/desktop/status'),
+  desktopStatus: () => request<DesktopHealth>('/api/local/desktop/status'),
+  taskDesktopTrust: (id: string) => request<DesktopTrust>(`/api/local/tasks/${item(id)}/desktop-trust`),
+  grantTaskDesktopTrust: (id: string, input: {scope:'observe'|'control';durationMinutes:15|60|480}) => request<DesktopTrust>(`/api/local/tasks/${item(id)}/desktop-trust`,{method:'PUT',body:json(input)}),
+  revokeTaskDesktopTrust: (id: string) => request<DesktopTrust>(`/api/local/tasks/${item(id)}/desktop-trust`,{method:'DELETE'}),
   taskWorkspace: (id: string) => request<TaskWorkspaceAccess>(`/api/local/tasks/${item(id)}/workspace`),
   setTaskWorkspace: (id: string, input: { projectId: string; additionalProjectIds: string[]; accessMode: WorkspaceAccessMode }) => request<TaskWorkspaceAccess>(`/api/local/tasks/${item(id)}/workspace`, { method: 'PUT', body: json(input) }),
   saveWorkspaceProject: (input: { name: string; path: string; chatGptProjectUrl?: string }) => request<WorkspaceProject>('/api/local/workspaces/projects', { method: 'POST', body: json(input) }),

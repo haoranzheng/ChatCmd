@@ -65,3 +65,29 @@ restore the backup before returning to the installed version.
 Record the preview SHA256 (from `SHA256SUMS.txt`), pass/fail for each
 checkpoint, and any ChatCMD/Windows-MCP logs. **Do not merge or use as a
 replacement production build until the CI and this human acceptance pass.**
+
+## Automatic health checks and per-conversation trust (v0.2)
+
+The local **Settings → Security** panel checks the enabled loopback service when
+opened and every 30 seconds. It verifies the MCP initialize/tools-list handshake,
+local TCP listener, seven required tool names, and whether `uvx` or
+`windows-mcp` is present on PATH. Diagnoses explain disabled integration,
+missing listener, missing launcher, wrong transport/protocol or missing tools.
+This **never** silently installs software, launches programs, modifies network
+settings or exposes a remote listener. The upstream must be started separately.
+
+In an existing conversation, use **Access permissions → Windows desktop trust**:
+choose **View screen only** or **View and control Windows**, a duration of
+15 minutes, 1 hour or 8 hours, and confirm locally. Granting requires a live,
+working Windows-MCP and the approved tool set. Trusted desktop calls then skip
+per-operation prompts **for that task only** and only for the chosen scope;
+other tasks and subagents never inherit trust. It can be revoked immediately.
+
+The trust is stored locally with expiry and bound to the current agent and
+Windows-MCP port. Changing or disabling desktop integration, changing the task
+workspace binding, or changing execution policy removes it. Global integration
+enabled, MCP tool allowlist and explicit Deny continue to take precedence.
+Desktop trust does **not** authorize shell commands, managed file writes,
+Windows-MCP `PowerShell`, registry or arbitrary process tools. Nonetheless
+trusted screen control can modify data through GUI applications. Use it only
+for trusted conversations and monitor sensitive screens.
