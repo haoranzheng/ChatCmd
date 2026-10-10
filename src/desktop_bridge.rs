@@ -112,7 +112,7 @@ async fn post(
         // A JSON response is complete once it parses. For SSE, wait for a
         // terminated event, not for the upstream to close the HTTP stream.
         let json_value = serde_json::from_slice::<Value>(&bytes).ok();
-        let sse_ready = bytes.windows(2).any(|w| w == b"\\n\\n");
+        let sse_ready = bytes.windows(2).any(|w| w == b"\n\n");
         let parsed = json_value.or_else(|| sse_ready.then(|| decode(&bytes).ok()).flatten());
         if let Some(value) = parsed {
             if value.get("id") != Some(&expected_id) {
