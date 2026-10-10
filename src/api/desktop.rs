@@ -87,8 +87,13 @@ mod tests {
     #[tokio::test]
     async fn extension_cannot_enable_desktop_bridge() {
         let (_state, app, _temp) = fixture("completed").await;
-        let response = extension_request(&app, "PUT", "/api/local/desktop/config",
-            json!({"enabled":true,"port":8000})).await;
+        let response = extension_request(
+            &app,
+            "PUT",
+            "/api/local/desktop/config",
+            json!({"enabled":true,"port":8000}),
+        )
+        .await;
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
         let response = extension_request(&app, "GET", "/api/local/desktop/status", json!({})).await;
         assert_eq!(response.status(), StatusCode::FORBIDDEN);
