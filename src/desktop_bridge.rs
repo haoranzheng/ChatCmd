@@ -94,7 +94,10 @@ async fn post(
         return Ok((Value::Null, next_session));
     }
     let expected_id = payload.get("id").cloned().ok_or_else(|| {
-        err("desktop_protocol_error", "A desktop request must have a JSON-RPC id")
+        err(
+            "desktop_protocol_error",
+            "A desktop request must have a JSON-RPC id",
+        )
     })?;
     let mut bytes = Vec::new();
     while let Some(chunk) = response
@@ -112,14 +115,21 @@ async fn post(
         // A JSON response is complete once it parses. For SSE, wait for a
         // terminated event, not for the upstream to close the HTTP stream.
         let json_value = serde_json::from_slice::<Value>(&bytes).ok();
-        let sse_ready = bytes.windows(2).any(|w| w == b"\n\n");
+        let sse_ready = bytes.windows(2).any(|w| w == b"\n\n")
+            || bytes.windows(4).any(|w| w == b"\r\n\r\n");
         let parsed = json_value.or_else(|| sse_ready.then(|| decode(&bytes).ok()).flatten());
         if let Some(value) = parsed {
             if value.get("id") != Some(&expected_id) {
-                return Err(err("desktop_protocol_error", "Unexpected JSON-RPC response id"));
+                return Err(err(
+                    "desktop_protocol_error",
+                    "Unexpected JSON-RPC response id",
+                ));
             }
             if value.get("error").is_some() {
-                return Err(err("desktop_upstream_error", "Windows-MCP rejected JSON-RPC call"));
+                return Err(err(
+                    "desktop_upstream_error",
+                    "Windows-MCP rejected JSON-RPC call",
+                ));
             }
             if value.get("result").is_none() {
                 return Err(err("desktop_protocol_error", "Missing JSON-RPC result"));
@@ -129,7 +139,10 @@ async fn post(
     }
     let value = decode(&bytes)?;
     if value.get("id") != Some(&expected_id) || value.get("result").is_none() {
-        return Err(err("desktop_protocol_error", "Invalid JSON-RPC response identity"));
+        return Err(err(
+            "desktop_protocol_error",
+            "Invalid JSON-RPC response identity",
+        ));
     }
     Ok((value, next_session))
 }
@@ -400,9 +413,12 @@ mod tests {
     #[test]
     fn rejects_incomplete_sse_and_accepts_complete_events() {
         let json = json!({"jsonrpc":"2.0","id":7,"result":{"ok":true}});
-        assert!(decode(format!("event: message\\ndata: {json}").as_bytes()).is_ok());
-        assert!(decode(b"event: message\\ndata: {\\\"jsonrpc\\\":").is_err());
-        assert_eq!(decode(format!("event: message\\ndata: {json}\\n\\n").as_bytes()).unwrap(), json);
+        assert!(decode(format!("event: message\ndata: {json}").as_bytes()).is_ok());
+        assert!(decode(b"event: message\ndata: {\\"jsonrpc\\":").is_err());
+        assert_eq!(
+            decode(format!("event: message\ndata: {json}\n\n").as_bytes()).unwrap(),
+            json
+        );
     }
     #[test]
     fn sse_and_json_parsing() {
