@@ -414,7 +414,7 @@ mod tests {
     fn rejects_incomplete_sse_and_accepts_complete_events() {
         let json = json!({"jsonrpc":"2.0","id":7,"result":{"ok":true}});
         assert!(decode(format!("event: message\ndata: {json}").as_bytes()).is_ok());
-        assert!(decode(b"event: message\ndata: {\\"jsonrpc\\":").is_err());
+        assert!(decode(b"event: message\ndata: {\"jsonrpc\":").is_err());
         assert_eq!(
             decode(format!("event: message\ndata: {json}\n\n").as_bytes()).unwrap(),
             json
