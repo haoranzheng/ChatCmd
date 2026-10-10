@@ -77,3 +77,20 @@ pub(super) async fn desktop_status(
         Err(e) => json!({"enabled":true,"connected":false,"tools":[],"error":e.code}),
     }))
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::api::chatgpt_router_tests::{extension_request, fixture};
+    use axum::http::StatusCode;
+    use serde_json::json;
+
+    #[tokio::test]
+    async fn extension_cannot_enable_desktop_bridge() {
+        let (_state, app, _temp) = fixture("completed").await;
+        let response = extension_request(&app, "PUT", "/api/local/desktop/config",
+            json!({"enabled":true,"port":8000})).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let response = extension_request(&app, "GET", "/api/local/desktop/status", json!({})).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+}

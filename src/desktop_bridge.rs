@@ -268,11 +268,14 @@ pub(crate) fn control(args: &Value) -> RuntimeResult<(&'static str, Value)> {
         }
         "shortcut" => {
             let s = field_text(args, "shortcut", 60)?;
-            if !s
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-'))
+            // Explicit safe-navigation list prevents shortcuts that launch commands
+            // or system utilities (e.g. Win+R) from bypassing process controls.
+            if !matches!(s.to_ascii_lowercase().as_str(),
+                "ctrl+a" | "ctrl+c" | "ctrl+v" | "ctrl+z" | "ctrl+f" | "ctrl+s"
+                | "alt+tab" | "tab" | "enter" | "esc" | "escape"
+                | "shift+tab" | "ctrl+tab" | "ctrl+shift+tab")
             {
-                return Err(err("desktop_invalid_arguments", "Invalid shortcut"));
+                return Err(err("desktop_denied", "Shortcut not in desktop v0.1 allowlist"));
             }
             out.insert("shortcut".into(), json!(s));
             "Shortcut"
@@ -351,6 +354,8 @@ mod tests {
         assert_eq!(tool, "App");
         assert_eq!(p, json!({"mode":"switch","name":"Notepad"}));
         assert!(control(&json!({"action":"click","loc":[1,2],"label":1})).is_err());
+        assert!(control(&json!({"action":"shortcut","shortcut":"win+r"})).is_err());
+        assert_eq!(control(&json!({"action":"shortcut","shortcut":"ctrl+s"})).unwrap().0,"Shortcut");
         assert!(control(&json!({"action":"type","label":1,"text":"X".repeat(2049)})).is_err());
     }
     #[test]

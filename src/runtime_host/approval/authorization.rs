@@ -274,7 +274,7 @@ impl RuntimeHost {
             .iter()
             .filter(|name| {
                 let capabilities = tool_capabilities(name);
-                capabilities.approval_required && capabilities.risk_class.is_safe_read()
+                capabilities.approval_required && capabilities.risk_class.is_safe_read() && !name.starts_with("desktop_")
             })
             .cloned()
             .collect::<Vec<_>>();
