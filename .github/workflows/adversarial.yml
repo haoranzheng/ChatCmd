@@ -28,7 +28,15 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --prefix web
-      - run: cargo test --workspace --no-fail-fast
+      # The workspace CI already runs the complete Rust suite on Windows and
+      # Linux. Tier 0 focuses on the distinct security regression contracts.
+      - run: timeout --signal=TERM --kill-after=10s 900s cargo test -p chatcmd-runtime --test adversarial_filesystem -- --nocapture
+        env:
+          RUST_TEST_THREADS: '2'
+      - run: timeout --signal=TERM --kill-after=10s 900s cargo test -p chatcmd-runtime --test mutation_safety -- --nocapture
+        env:
+          RUST_TEST_THREADS: '2'
+      - run: timeout --signal=TERM --kill-after=10s 900s cargo test -p chatcmd-mcp --test release_catalog_smoke -- --nocapture
         env:
           RUST_TEST_THREADS: '2'
 

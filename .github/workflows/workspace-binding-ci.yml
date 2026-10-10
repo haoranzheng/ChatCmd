@@ -34,9 +34,43 @@ jobs:
       - run: npm ci --prefix web
       # SQLite integration tests contend for file handles under Windows when the
       # entire test binary runs at the default host-parallelism.
-      - run: cargo test --workspace --no-fail-fast
+      # Keep the known-good Windows path unchanged. On Linux, isolate the
+      # crate and host suites so stalled jobs produce an actionable location.
+      - name: Rust workspace tests (Windows)
+        if: runner.os == 'Windows'
+        run: cargo test --workspace --no-fail-fast
         env:
           RUST_TEST_THREADS: '2'
+      - name: Rust library and MCP tests (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=10s 900s \
+            cargo test -p chatcmd-core -p chatcmd-storage -p chatcmd-runtime -p chatcmd-mcp --no-fail-fast -- --nocapture \
+            2>&1 | tee "${RUNNER_TEMP}/linux-libraries-tests.log"
+        env:
+          RUST_TEST_THREADS: '2'
+      - name: Rust client and host tests (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -o pipefail
+          timeout --signal=TERM --kill-after=10s 900s \
+            cargo test -p chat-cmd-client --no-fail-fast -- --nocapture \
+            2>&1 | tee "${RUNNER_TEMP}/linux-host-tests.log"
+        env:
+          RUST_TEST_THREADS: '2'
+      - name: Upload Linux test diagnostics
+        if: always() && runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-rust-test-diagnostics
+          path: |
+            ${{ runner.temp }}/linux-libraries-tests.log
+            ${{ runner.temp }}/linux-host-tests.log
+          if-no-files-found: warn
+          retention-days: 7
       - run: cargo build --bin chat-cmd-client
         if: runner.os == 'Windows'
       - name: Build portable Windows x64 preview
