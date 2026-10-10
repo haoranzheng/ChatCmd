@@ -43,6 +43,24 @@ impl RuntimeHost {
         let resolved_arguments = self
             .resolve_approval_paths(context, tool, arguments)
             .await?;
+        // Local-UI trust is strictly bound to this task and agent. It never
+        // inherits to child tasks, and it does not override Deny or the tool
+        // catalog allowlist checked by the outer runtime call.
+        if desktop_tool {
+            let (enabled, port) = crate::desktop_bridge::config(self.repository.pool()).await?;
+            if enabled
+                && crate::desktop_bridge::is_trusted(
+                    self.repository.pool(),
+                    task_id.as_str(),
+                    &context.agent_id,
+                    tool,
+                    port,
+                )
+                .await?
+            {
+                return Ok(());
+            }
+        }
         if !desktop_tool && capabilities.risk_class.is_safe_read()
             && self
                 .consume_safe_read_grant(context, tool, &resolved_arguments)

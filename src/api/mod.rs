@@ -32,6 +32,7 @@ mod chatgpt_tests;
 mod custom_fonts;
 mod data;
 mod desktop;
+mod desktop_trust;
 mod folders;
 mod overview;
 mod plan_questions;

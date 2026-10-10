@@ -28,6 +28,39 @@ pub(crate) async fn config(pool: &sqlx::SqlitePool) -> RuntimeResult<(bool, u16)
     }
     Ok((enabled, port))
 }
+/// Read one locally granted task-specific desktop trust. This does not
+/// authorize any MCP tool on its own: the caller still checks the tool catalog,
+/// task/root Deny mode and global desktop enable flag.
+pub(crate) async fn is_trusted(
+    pool: &sqlx::SqlitePool,
+    task_id: &str,
+    agent_id: &str,
+    tool: &str,
+    port: u16,
+) -> RuntimeResult<bool> {
+    if !matches!(tool, "desktop_observe" | "desktop_control") {
+        return Ok(false);
+    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |duration| i64::try_from(duration.as_millis()).unwrap_or(i64::MAX));
+    let exists: i64 = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM desktop_task_trust d JOIN tasks t ON t.id=d.task_id
+         WHERE d.task_id=? AND d.agent_id=? AND t.agent_id=d.agent_id
+         AND d.port=? AND d.expires_at_ms>?
+         AND (d.scope='control' OR (?='desktop_observe' AND d.scope='observe')))"
+    )
+    .bind(task_id)
+    .bind(agent_id)
+    .bind(i64::from(port))
+    .bind(now)
+    .bind(tool)
+    .fetch_one(pool)
+    .await
+    .map_err(|_| err("desktop_storage_error", "Cannot read desktop task trust"))?;
+    Ok(exists == 1)
+}
+
 pub(crate) fn allowed_port(port: u16, chatcmd_port: Option<u16>) -> bool {
     port > 0 && Some(port) != chatcmd_port
 }

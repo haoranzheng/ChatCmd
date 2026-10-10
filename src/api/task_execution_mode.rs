@@ -105,6 +105,12 @@ async fn persist_user_execution_mode(
         .execute(&mut *transaction)
         .await
         .map_err(db_problem)?;
+    // An execution-policy change invalidates previously granted unattended desktop trust.
+    sqlx::query("DELETE FROM desktop_task_trust WHERE task_id=?")
+        .bind(task_id.as_str())
+        .execute(&mut *transaction)
+        .await
+        .map_err(db_problem)?;
     sqlx::query("INSERT INTO timeline_events(event_id,task_id,turn_id,session_id,actor,kind,idempotency_key,payload_json,metadata_json,created_at_ms) VALUES(?,?,NULL,NULL,'user','status',?,?,NULL,?)")
         .bind(&decision_id)
         .bind(task_id.as_str())
