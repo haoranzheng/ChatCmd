@@ -1,6 +1,6 @@
 //! Authenticated, local-UI-only task workspace binding.
 //! An MCP caller cannot mint or broaden this authority.
-use std::path::{Path as FsPath, PathBuf};
+use std::{collections::HashSet, path::{Path as FsPath, PathBuf}};
 
 use axum::{
     Json,
@@ -21,6 +21,8 @@ use crate::websocket::{AppEvent, AppState};
 pub(super) struct TaskWorkspaceChange {
     project_id: String,
     access_mode: String,
+    #[serde(default)]
+    additional_project_ids: Vec<String>,
 }
 
 pub(super) async fn task_workspace(
@@ -39,7 +41,10 @@ pub(super) async fn task_workspace(
             .fetch_optional(state.repository.pool())
             .await
             .map_err(db_problem)?;
+    let additional_project_ids = sqlx::query_scalar::<_, String>("SELECT project_id FROM task_workspace_extra_roots WHERE task_id=? ORDER BY project_id")
+        .bind(&id).fetch_all(state.repository.pool()).await.map_err(db_problem)?;
     Ok(Json(json!({
+        "additionalProjectIds": additional_project_ids,
         "taskId": id,
         "projectFolder": task.get::<Option<String>, _>("project_folder"),
         "projectId": binding.as_ref().and_then(|row| row.get::<Option<String>, _>("project_id")),
@@ -63,6 +68,14 @@ pub(super) async fn set_task_workspace(
             "Choose restricted, readOnly, or readWrite.",
         ));
     }
+    if change.additional_project_ids.len() > 15 {
+        return Err(Problem::new(StatusCode::BAD_REQUEST, "Too many workspace roots", "Select no more than 15 additional folders."));
+    }
+    let mut selected = HashSet::new();
+    selected.insert(change.project_id.as_str());
+    if !change.additional_project_ids.iter().all(|id| selected.insert(id.as_str())) {
+        return Err(Problem::new(StatusCode::BAD_REQUEST, "Duplicate workspace roots", "Choose distinct saved projects."));
+    }
     let row = sqlx::query("SELECT path FROM workspace_projects WHERE id=?")
         .bind(&change.project_id)
         .fetch_optional(state.repository.pool())
@@ -77,6 +90,18 @@ pub(super) async fn set_task_workspace(
         })?;
     let canonical = validate_workspace_root(row.get::<&str, _>("path"))?;
     let folder = canonical.to_string_lossy().into_owned();
+    let mut additional_roots = Vec::new();
+    let mut canonical_roots = HashSet::from([canonical.clone()]);
+    for project_id in &change.additional_project_ids {
+        let row = sqlx::query("SELECT path FROM workspace_projects WHERE id=?")
+            .bind(project_id).fetch_optional(state.repository.pool()).await.map_err(db_problem)?
+            .ok_or_else(|| Problem::new(StatusCode::NOT_FOUND, "Workspace project not found", "Select an existing saved folder."))?;
+        let root = validate_workspace_root(row.get::<&str, _>("path"))?;
+        if !canonical_roots.insert(root.clone()) {
+            return Err(Problem::new(StatusCode::BAD_REQUEST, "Duplicate workspace roots", "Selected projects resolve to the same folder."));
+        }
+        additional_roots.push((project_id, root.to_string_lossy().into_owned()));
+    }
     let now = now_ms();
     let audit_id = Uuid::new_v4().to_string();
     let mut tx = state.repository.pool().begin().await.map_err(db_problem)?;
@@ -96,6 +121,12 @@ pub(super) async fn set_task_workspace(
     sqlx::query("INSERT INTO task_workspace_access(task_id,project_id,access_mode,updated_at_ms) VALUES(?,?,?,?) ON CONFLICT(task_id) DO UPDATE SET project_id=excluded.project_id,access_mode=excluded.access_mode,updated_at_ms=excluded.updated_at_ms")
         .bind(&id).bind(&change.project_id).bind(&change.access_mode).bind(now)
         .execute(&mut *tx).await.map_err(db_problem)?;
+    sqlx::query("DELETE FROM task_workspace_extra_roots WHERE task_id=?")
+        .bind(&id).execute(&mut *tx).await.map_err(db_problem)?;
+    for (project_id, root) in &additional_roots {
+        sqlx::query("INSERT INTO task_workspace_extra_roots(task_id,project_id,authorized_root) VALUES(?,?,?)")
+            .bind(&id).bind(project_id).bind(root).execute(&mut *tx).await.map_err(db_problem)?;
+    }
     // Binding changes invalidate earlier approvals and inherited read grants.
     sqlx::query("WITH RECURSIVE tree(id) AS (SELECT ? UNION SELECT child_task_id FROM subagent_runs JOIN tree ON parent_task_id=tree.id WHERE child_task_id IS NOT NULL) UPDATE approvals SET state='cancelled',decision_json=json_object('reason','workspace binding changed'),resolved_at_ms=? WHERE task_id IN (SELECT id FROM tree) AND state='pending'")
         .bind(&id).bind(now).execute(&mut *tx).await.map_err(db_problem)?;
@@ -105,7 +136,7 @@ pub(super) async fn set_task_workspace(
     sqlx::query("INSERT INTO task_execution_modes(task_id,mode,updated_at_ms) VALUES(?,'approval',?) ON CONFLICT(task_id) DO UPDATE SET mode='approval',updated_at_ms=excluded.updated_at_ms")
         .bind(&id).bind(now).execute(&mut *tx).await.map_err(db_problem)?;
     let payload = json!({"source":"authenticatedLocalUi","change":"taskWorkspaceAccess",
-        "projectId":change.project_id,"accessMode":change.access_mode,"auditId":audit_id});
+        "projectId":change.project_id,"additionalProjectIds":change.additional_project_ids,"accessMode":change.access_mode,"auditId":audit_id});
     sqlx::query("INSERT INTO timeline_events(event_id,task_id,turn_id,session_id,actor,kind,idempotency_key,payload_json,metadata_json,created_at_ms) VALUES(?,?,NULL,NULL,'user','status',?,?,NULL,?)")
         .bind(&audit_id).bind(&id).bind(&audit_id).bind(payload.to_string()).bind(now)
         .execute(&mut *tx).await.map_err(db_problem)?;
@@ -115,6 +146,7 @@ pub(super) async fn set_task_workspace(
     state.publish(event);
     Ok(Json(
         json!({"taskId":id,"projectId":change.project_id,"projectFolder":folder,
+        "additionalProjectIds":change.additional_project_ids,
         "accessMode":change.access_mode,"locallyAuthorized":true}),
     ))
 }
@@ -127,7 +159,7 @@ fn missing_task() -> Problem {
     )
 }
 
-pub(super) fn validate_workspace_root(value: &str) -> Result<PathBuf, Problem> {
+pub(crate) fn validate_workspace_root(value: &str) -> Result<PathBuf, Problem> {
     let requested = FsPath::new(value);
     if !requested.is_absolute() {
         return Err(Problem::new(

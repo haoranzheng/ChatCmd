@@ -47,6 +47,7 @@ async fn bind(state: Arc<AppState>, task: &str, project: &str, mode: &str) {
         Json(TaskWorkspaceChange {
             project_id: project.to_owned(),
             access_mode: mode.to_owned(),
+            additional_project_ids: Vec::new(),
         }),
     )
     .await

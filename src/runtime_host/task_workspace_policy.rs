@@ -26,6 +26,31 @@ pub(in crate::runtime_host) fn is_workspace_write_tool(tool: &str) -> bool {
 }
 
 impl RuntimeHost {
+    /// Extra roots are snapshot-bound to the exact directories approved by the local UI.
+    /// A moved, removed, or reparse-point directory must fail closed.
+    pub(crate) async fn additional_workspace_roots(&self, task_id: Option<&str>) -> RuntimeResult<Vec<PathBuf>> {
+        let Some(task_id) = task_id else { return Ok(Vec::new()); };
+        let mode = sqlx::query_scalar::<_, String>("SELECT access_mode FROM task_workspace_access WHERE task_id=?")
+            .bind(task_id).fetch_optional(self.repository.pool()).await
+            .map_err(|_| RuntimeError::new("storage_error", "workspace access lookup failed"))?;
+        if !matches!(mode.as_deref(), Some("readOnly" | "readWrite")) { return Ok(Vec::new()); }
+        let rows = sqlx::query("SELECT r.authorized_root,p.path FROM task_workspace_extra_roots r LEFT JOIN workspace_projects p ON p.id=r.project_id WHERE r.task_id=? ORDER BY r.project_id")
+            .bind(task_id).fetch_all(self.repository.pool()).await
+            .map_err(|_| RuntimeError::new("storage_error", "additional workspace lookup failed"))?;
+        let mut roots = Vec::with_capacity(rows.len());
+        for row in rows {
+            let path = row.get::<Option<String>, _>("path").ok_or_else(|| RuntimeError::new("approval_scope_invalid", "An additional workspace project was removed."))?;
+            let expected = row.get::<String, _>("authorized_root");
+            let root = crate::api::task_workspace::validate_workspace_root(&path)
+                .map_err(|_| RuntimeError::new("approval_scope_invalid", "An additional workspace path is missing or unsafe."))?;
+            if root != Path::new(&expected) {
+                return Err(RuntimeError::new("approval_scope_invalid", "An additional project root changed; reauthorize it locally."));
+            }
+            roots.push(root);
+        }
+        Ok(roots)
+    }
+
     pub(crate) async fn require_workspace_access(
         &self,
         context: &OperationContext,
@@ -105,6 +130,8 @@ impl RuntimeHost {
                 "The task project changed since authorization. Rebind it in the local UI.",
             ));
         }
+        let mut allowed_roots = vec![root.clone()];
+        allowed_roots.extend(self.additional_workspace_roots(Some(task_id)).await?);
         let targets = mutation_paths(tool, arguments, &root)?;
         if targets.is_empty() {
             return Err(RuntimeError::new(
@@ -113,7 +140,9 @@ impl RuntimeHost {
             ));
         }
         for target in targets {
-            validate_target_in_root(&root, &target)?;
+            if !allowed_roots.iter().any(|allowed| validate_target_in_root(allowed, &target).is_ok()) {
+                return Err(outside_scope());
+            }
         }
         Ok(())
     }

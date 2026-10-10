@@ -54,6 +54,11 @@ impl RuntimeHost {
             self.require_workspace_access(&context, tool, &arguments)
                 .await?;
         }
+        let additional_roots = if filesystem_tool || tool.starts_with("git_") || tool == "workspace_roots" {
+            self.additional_workspace_roots(context.task_id.as_deref()).await?
+        } else {
+            Vec::new()
+        };
         let mut task_path_scopes = if writes_workspace {
             Vec::new()
         } else if filesystem_tool
@@ -69,6 +74,9 @@ impl RuntimeHost {
         {
             task_path_scopes.push(project_folder.clone());
         }
+        task_path_scopes.extend(additional_roots.iter().cloned());
+        task_path_scopes.sort();
+        task_path_scopes.dedup();
         let arguments = if filesystem_tool {
             filesystem_dispatch::resolve_relative_paths(arguments, project_folder.as_deref())?
         } else {
@@ -236,7 +244,11 @@ impl RuntimeHost {
                 value(self.shell.inspect(&input.session_id).await?)
             }
             "workspace_roots" => match project_folder {
-                Some(project_folder) => value(vec![project_folder]),
+                Some(project_folder) => {
+                    let mut roots = vec![project_folder];
+                    roots.extend(additional_roots);
+                    value(roots)
+                }
                 None => value(task_path_scopes),
             },
             "project_context" => {
