@@ -67,3 +67,6 @@ record's actual tool name and requires `highRiskAcknowledged=true` for approval;
 rejecting remains one action. This is not a reusable grant and does not extend
 any workspace or tool permissions. Shell commands remain separately governed by
 existing permission and command approval gates; UI warnings are not an OS sandbox.
+
+
+The local task trust card refreshes read-only usage and expiry every five seconds while visible, and supports manual refresh. No automatic grant renewal. High-risk approvals now distinguish source/destination, preview requests, approximate data size, and quarantine-vs-possible-permanent delete outcomes.

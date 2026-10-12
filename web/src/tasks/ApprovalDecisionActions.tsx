@@ -11,6 +11,14 @@ function HighRiskWarning({ risk }: { risk: HighRiskApproval }) {
   return <div className="approval-high-risk-warning" role="alert">
     <div className="approval-high-risk-heading"><AlertTriangle aria-hidden="true" /><strong>{tr('High-risk action: {action}', { action: risk.title })}</strong></div>
     <p>{risk.consequence}</p>
+    {risk.source && <p><strong>{tr('Source:')}</strong> <code className="approval-high-risk-fullpath">{risk.source}</code></p>}
+    {risk.destination && <p><strong>{tr('Destination:')}</strong> <code className="approval-high-risk-fullpath">{risk.destination}</code></p>}
+    {risk.operation === 'fs_delete' && <p><strong>{risk.mode === 'quarantine'
+      ? tr('Recovery: moved to quarantine; restore may be possible until cleanup.')
+      : tr('Recovery: deletion may be permanent. Do not assume it can be undone.')}</strong></p>}
+    {risk.dryRun && <p>{tr('Preview requested: review the preview result before a live operation.')}</p>}
+    {risk.contentBytesEstimate !== null && <p>{tr('Estimated data: {bytes} bytes', {bytes:risk.contentBytesEstimate})}</p>}
+    {risk.expectedVersion && <p>{tr('File version check included')}</p>}
     {risk.paths.length > 0
       ? <div className="approval-high-risk-paths"><strong>{tr('Affected paths')}</strong>
         <ul>{risk.paths.map((path, index) => <li key={index}><code title={path}>{path}</code></li>)}</ul>

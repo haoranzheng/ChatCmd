@@ -9,6 +9,11 @@ export interface HighRiskApproval {
   overwrite: boolean;
   mode: string | null;
   operation: string;
+  source: string | null;
+  destination: string | null;
+  dryRun: boolean;
+  contentBytesEstimate: number | null;
+  expectedVersion: boolean;
 }
 
 /**
@@ -51,5 +56,11 @@ export function highRiskApproval(tool: string | undefined, rawSummary: unknown):
     overwrite: summary.overwrite === true,
     mode: typeof summary.deleteMode === 'string' ? summary.deleteMode : null,
     operation,
+    source: typeof summary.source === 'string' && summary.source ? summary.source : (['fs_move','fs_copy'].includes(operation) ? paths[0] ?? null : null),
+    destination: typeof summary.destination === 'string' && summary.destination ? summary.destination : (['fs_move','fs_copy'].includes(operation) ? paths[1] ?? null : null),
+    dryRun: summary.dryRun === true,
+    contentBytesEstimate: typeof summary.contentBytesEstimate === 'number' && Number.isFinite(summary.contentBytesEstimate)
+      ? Math.max(0, Math.trunc(summary.contentBytesEstimate)) : null,
+    expectedVersion: typeof summary.expectedVersion === 'string' && summary.expectedVersion.length > 0,
   };
 }

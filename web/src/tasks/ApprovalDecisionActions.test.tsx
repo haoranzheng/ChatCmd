@@ -50,7 +50,12 @@ describe('ApprovalDecisionActions', () => {
 describe('highRiskApproval', () => {
   it('classifies risky tools conservatively and keeps paths as literal text', () => {
     expect(highRiskApproval('fs_delete', {paths:['<script>alert(1)</script>']} )?.paths[0]).toBe('<script>alert(1)</script>');
-    expect(highRiskApproval('fs_move', {paths:['source','destination'],overwrite:true})?.overwrite).toBe(true);
+    const move = highRiskApproval('fs_move', {paths:['source','destination'],overwrite:true,contentBytesEstimate:2048,dryRun:true});
+    expect(move?.overwrite).toBe(true);
+    expect(move?.source).toBe('source');
+    expect(move?.destination).toBe('destination');
+    expect(move?.contentBytesEstimate).toBe(2048);
+    expect(move?.dryRun).toBe(true);
     expect(highRiskApproval('fs_write_raw', {paths:['a.bin']})).not.toBeNull();
     expect(highRiskApproval('fs_replace_text', {paths:['readme.md']})).toBeNull();
   });
