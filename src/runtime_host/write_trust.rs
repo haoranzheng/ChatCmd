@@ -124,63 +124,148 @@ mod tests {
     async fn consent_is_bound_to_task_agent_scope_revision_budget_and_expiry() {
         use crate::runtime_host::user_message_tests;
         let (host, agent, dir) = user_message_tests::test_host().await;
-        let reply = host.call_persisted(
-            "agent_user_message",
-            user_message_tests::turn_context(
-                "write-trust-user", &agent, "agent_user_message",
-                "write-trust-turn", "write-trust-scope",
-            ),
-            json!({"content":"Check scoped text edit approvals"}),
-        ).await.expect("bind real conversation");
+        let reply = host
+            .call_persisted(
+                "agent_user_message",
+                user_message_tests::turn_context(
+                    "write-trust-user",
+                    &agent,
+                    "agent_user_message",
+                    "write-trust-turn",
+                    "write-trust-scope",
+                ),
+                json!({"content":"Check scoped text edit approvals"}),
+            )
+            .await
+            .expect("bind real conversation");
         let task = reply["taskId"].as_str().expect("task").to_owned();
-        let scope: String = sqlx::query_scalar(
-            "SELECT conversation_scope_hash FROM tasks WHERE id=?"
-        ).bind(&task).fetch_one(host.repository.pool()).await.expect("conversation scope");
-        let root = dir.path().canonicalize().expect("canonical root")
-            .to_string_lossy().into_owned();
+        let scope: String =
+            sqlx::query_scalar("SELECT conversation_scope_hash FROM tasks WHERE id=?")
+                .bind(&task)
+                .fetch_one(host.repository.pool())
+                .await
+                .expect("conversation scope");
+        let root = dir
+            .path()
+            .canonicalize()
+            .expect("canonical root")
+            .to_string_lossy()
+            .into_owned();
         sqlx::query("INSERT INTO workspace_projects(id,name,path,canonical_path,created_at_ms,updated_at_ms)
             VALUES('write-trust-project','test',?,?,1,1)")
             .bind(&root).bind(&root).execute(host.repository.pool()).await.expect("project");
         sqlx::query("UPDATE tasks SET project_folder=? WHERE id=?")
-            .bind(&root).bind(&task).execute(host.repository.pool()).await.expect("bind root");
-        sqlx::query("INSERT INTO task_workspace_access(task_id,project_id,access_mode,updated_at_ms)
-            VALUES(?,'write-trust-project','readWrite',7)")
-            .bind(&task).execute(host.repository.pool()).await.expect("bind read/write");
+            .bind(&root)
+            .bind(&task)
+            .execute(host.repository.pool())
+            .await
+            .expect("bind root");
+        sqlx::query(
+            "INSERT INTO task_workspace_access(task_id,project_id,access_mode,updated_at_ms)
+            VALUES(?,'write-trust-project','readWrite',7)",
+        )
+        .bind(&task)
+        .execute(host.repository.pool())
+        .await
+        .expect("bind read/write");
         sqlx::query("INSERT INTO task_write_trust(task_id,agent_id,conversation_scope,root,workspace_revision,
             expires_at_ms,max_calls,used_calls,updated_at_ms) VALUES(?,?,?,?,7,?,2,0,1)")
             .bind(&task).bind(&agent).bind(&scope).bind(&root)
             .bind(crate::runtime_host::now_ms()+60_000)
             .execute(host.repository.pool()).await.expect("trust fixture");
-        let mut ctx=OperationContext::new("write-trust-1",&agent,"fs_replace_text");
-        ctx.task_id=Some(task.clone());
-        ctx.turn_id=Some("write-trust-turn".into());
-        ctx.conversation_scope_id=Some(scope.clone());
-        let args=json!({"path":dir.path().join("source.rs"),"oldText":"old","newText":"new"});
-        assert!(consume(host.repository.pool(),&ctx,"fs_replace_text",&args).await.expect("first"));
-        assert!(consume(host.repository.pool(),&ctx,"fs_replace_text",&args).await.expect("second"));
-        assert!(!consume(host.repository.pool(),&ctx,"fs_replace_text",&args).await.expect("budget"));
-        let uses:i64=sqlx::query_scalar("SELECT used_calls FROM task_write_trust WHERE task_id=?")
-            .bind(&task).fetch_one(host.repository.pool()).await.expect("count");
-        assert_eq!(uses,2);
-        assert!(!consume(host.repository.pool(),&ctx,"fs_write_raw",&args).await.expect("binary"));
-        assert!(!consume(host.repository.pool(),&ctx,"fs_delete",&args).await.expect("delete"));
+        let mut ctx = OperationContext::new("write-trust-1", &agent, "fs_replace_text");
+        ctx.task_id = Some(task.clone());
+        ctx.turn_id = Some("write-trust-turn".into());
+        ctx.conversation_scope_id = Some(scope.clone());
+        let args = json!({"path":dir.path().join("source.rs"),"oldText":"old","newText":"new"});
+        assert!(
+            consume(host.repository.pool(), &ctx, "fs_replace_text", &args)
+                .await
+                .expect("first")
+        );
+        assert!(
+            consume(host.repository.pool(), &ctx, "fs_replace_text", &args)
+                .await
+                .expect("second")
+        );
+        assert!(
+            !consume(host.repository.pool(), &ctx, "fs_replace_text", &args)
+                .await
+                .expect("budget")
+        );
+        let uses: i64 =
+            sqlx::query_scalar("SELECT used_calls FROM task_write_trust WHERE task_id=?")
+                .bind(&task)
+                .fetch_one(host.repository.pool())
+                .await
+                .expect("count");
+        assert_eq!(uses, 2);
+        assert!(
+            !consume(host.repository.pool(), &ctx, "fs_write_raw", &args)
+                .await
+                .expect("binary")
+        );
+        assert!(
+            !consume(host.repository.pool(), &ctx, "fs_delete", &args)
+                .await
+                .expect("delete")
+        );
         sqlx::query("UPDATE task_write_trust SET used_calls=0 WHERE task_id=?")
-            .bind(&task).execute(host.repository.pool()).await.expect("reset for negative cases");
-        let mut other=ctx.clone();other.conversation_scope_id=Some("other-scope".into());
-        assert!(!consume(host.repository.pool(),&other,"fs_replace_text",&args).await.expect("wrong scope"));
-        let mut other_agent=ctx.clone();other_agent.agent_id="another-agent".into();
-        assert!(!consume(host.repository.pool(),&other_agent,"fs_replace_text",&args).await.expect("wrong agent"));
+            .bind(&task)
+            .execute(host.repository.pool())
+            .await
+            .expect("reset for negative cases");
+        let mut other = ctx.clone();
+        other.conversation_scope_id = Some("other-scope".into());
+        assert!(
+            !consume(host.repository.pool(), &other, "fs_replace_text", &args)
+                .await
+                .expect("wrong scope")
+        );
+        let mut other_agent = ctx.clone();
+        other_agent.agent_id = "another-agent".into();
+        assert!(
+            !consume(
+                host.repository.pool(),
+                &other_agent,
+                "fs_replace_text",
+                &args
+            )
+            .await
+            .expect("wrong agent")
+        );
         sqlx::query("UPDATE task_workspace_access SET updated_at_ms=8 WHERE task_id=?")
-            .bind(&task).execute(host.repository.pool()).await.expect("change binding");
-        assert!(!consume(host.repository.pool(),&ctx,"fs_replace_text",&args).await.expect("revision changed"));
+            .bind(&task)
+            .execute(host.repository.pool())
+            .await
+            .expect("change binding");
+        assert!(
+            !consume(host.repository.pool(), &ctx, "fs_replace_text", &args)
+                .await
+                .expect("revision changed")
+        );
         sqlx::query("UPDATE task_workspace_access SET updated_at_ms=7,access_mode='readOnly' WHERE task_id=?")
             .bind(&task).execute(host.repository.pool()).await.expect("revoke read/write");
-        assert!(!consume(host.repository.pool(),&ctx,"fs_replace_text",&args).await.expect("read-only"));
+        assert!(
+            !consume(host.repository.pool(), &ctx, "fs_replace_text", &args)
+                .await
+                .expect("read-only")
+        );
         sqlx::query("UPDATE task_workspace_access SET access_mode='readWrite' WHERE task_id=?")
-            .bind(&task).execute(host.repository.pool()).await.expect("restore mode");
+            .bind(&task)
+            .execute(host.repository.pool())
+            .await
+            .expect("restore mode");
         sqlx::query("UPDATE task_write_trust SET expires_at_ms=0 WHERE task_id=?")
-            .bind(&task).execute(host.repository.pool()).await.expect("expire trust");
-        assert!(!consume(host.repository.pool(),&ctx,"fs_replace_text",&args).await.expect("expired"));
+            .bind(&task)
+            .execute(host.repository.pool())
+            .await
+            .expect("expire trust");
+        assert!(
+            !consume(host.repository.pool(), &ctx, "fs_replace_text", &args)
+                .await
+                .expect("expired")
+        );
     }
 
     #[test]
