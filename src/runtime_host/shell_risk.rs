@@ -72,6 +72,15 @@ fn danger_reason(command: &str) -> Option<&'static str> {
         .replace(['\r', '\n', '\t'], " ");
     let words = normalized.split_whitespace().collect::<Vec<_>>();
     let includes = |needle: &str| normalized.contains(needle);
+    // robocopy accepts source and destination BEFORE /MIR or /PURGE.
+    // Searching for adjacent "robocopy /mir" misses the common form.
+    if words
+        .iter()
+        .any(|word| word.ends_with("robocopy") || word.ends_with("robocopy.exe"))
+        && words.iter().any(|word| matches!(*word, "/mir" | "/purge"))
+    {
+        return Some("Recognized potentially destructive command or overwrite");
+    }
     if [
         "remove-item",
         "remove-variable",
@@ -262,6 +271,7 @@ mod tests {
             ("powershell.exe", vec!["-Command", "Move-Item a b"]),
             ("python.exe", vec!["-c", "print('x')"]),
             ("robocopy", vec!["source", "dest", "/mir"]),
+            ("robocopy.exe", vec!["source", "dest", "/PURGE"]),
             ("powershell.exe", vec!["-EncodedCommand", "AAE="]),
             ("pwsh.exe", vec!["-File", "script.ps1"]),
         ] {
