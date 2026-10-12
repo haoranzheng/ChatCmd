@@ -49,3 +49,21 @@ This is a managed filesystem authorization boundary, **not** a process sandbox. 
 | `approval_timeout` | The individual operation approval expired | Request the operation again and approve it locally |
 
 Neither public MCP traffic nor ChatGPT extension requests may invoke `PUT /api/local/tasks/{id}/workspace`. The route is protected by the existing local management session authentication and the extension route allowlist. The audit timeline records only task/project IDs and permission decisions, not file contents or credentials.
+
+
+## High-risk operation warnings and one-time acknowledgement
+
+The authenticated local approval UI now displays an explicit high-risk warning
+for deletes, moves, copies, raw binary writes, quarantine cleanup/restoration,
+process/terminal force-closes, Git commits and pushes. The warning names the
+operation, states the potential loss or overwrite, and shows the server-redacted
+approval summary's literal affected paths and flags (recursive, overwrite, mode).
+Full paths wrap instead of being hidden; no file payload is revealed.
+
+One click on the ordinary approval row **does not** authorize these operations.
+The operator must open a focused warning dialog and check an acknowledgement
+before approving once. The local API independently checks the trusted approval
+record's actual tool name and requires `highRiskAcknowledged=true` for approval;
+rejecting remains one action. This is not a reusable grant and does not extend
+any workspace or tool permissions. Shell commands remain separately governed by
+existing permission and command approval gates; UI warnings are not an OS sandbox.

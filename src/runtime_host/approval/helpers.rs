@@ -61,6 +61,7 @@ fn approval_summary(tool: &str, risk: ToolRiskClass, arguments: &Value) -> Value
         .map(|path| normalized_path(&path))
         .collect::<Vec<_>>();
     json!({"operation": tool, "riskClass": risk, "paths": paths, "pathCount": paths.len(),
+        "source": arguments.get("source"), "destination": arguments.get("destination"),
         "desktop": desktop_approval_summary(tool, arguments),
         "overwrite": arguments.get("overwrite"), "recursive": arguments.get("recursive"),
         "deleteMode": arguments.get("mode"), "expectedVersion": arguments.get("expectedVersion"),

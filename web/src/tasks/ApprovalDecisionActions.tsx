@@ -1,22 +1,94 @@
-import { Ban, Check, CheckCheck, CircleAlert, LoaderCircle, X } from 'lucide-react';
+import { AlertTriangle, Ban, Check, CheckCheck, CircleAlert, LoaderCircle, X } from 'lucide-react';
 import { FormEvent, useEffect, useId, useRef, useState } from 'react';
 import { api } from '../api';
+import { Modal } from '../components';
 import { tr } from '../i18n';
+import { highRiskApproval, type HighRiskApproval } from './highRiskApproval';
 
 export interface ApprovalDecisionTarget { taskId: string; activityId: string; turnId?: string; }
 
-export function ApprovalDecisionActions({ target, onResolved, reusable = true }: { target: ApprovalDecisionTarget; onResolved?: () => void; reusable?: boolean }) {
-  const [busy, setBusy] = useState<'allow' | 'allowSimilar' | 'reject' | null>(null); const [error, setError] = useState(''); const [rejecting, setRejecting] = useState(false);
-  const resolve = async (decision: 'allow' | 'allowSimilar' | 'reject', reason?: string) => {
-    if (busy) return; setBusy(decision); setError('');
-    try { await api.resolveTaskApproval(target.taskId, target.activityId, { turnId: target.turnId, decision, reason }); setRejecting(false); onResolved?.(); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : tr('Could not send approval decision.')); setBusy(null); }
+function HighRiskWarning({ risk }: { risk: HighRiskApproval }) {
+  return <div className="approval-high-risk-warning" role="alert">
+    <div className="approval-high-risk-heading"><AlertTriangle aria-hidden="true" /><strong>{tr('High-risk action: {action}', { action: risk.title })}</strong></div>
+    <p>{risk.consequence}</p>
+    {risk.paths.length > 0
+      ? <div className="approval-high-risk-paths"><strong>{tr('Affected paths')}</strong>
+        <ul>{risk.paths.map((path, index) => <li key={index}><code title={path}>{path}</code></li>)}</ul>
+        {risk.pathCount > risk.paths.length && <small>{tr('Plus {count} additional paths', { count: risk.pathCount - risk.paths.length })}</small>}
+      </div>
+      : <p className="approval-high-risk-no-path">{tr('Target details are not available. Inspect the request before approval.')}</p>}
+    <div className="approval-high-risk-flags">
+      {risk.recursive && <span>{tr('Includes nested folders')}</span>}
+      {risk.overwrite && <span>{tr('May overwrite existing data')}</span>}
+      {risk.mode && <span>{tr('Deletion mode: {mode}', { mode: risk.mode })}</span>}
+    </div>
+  </div>;
+}
+
+export function ApprovalDecisionActions({ target, onResolved, reusable = true, tool, summary }: {
+  target: ApprovalDecisionTarget;
+  onResolved?: () => void;
+  reusable?: boolean;
+  tool?: string;
+  summary?: unknown;
+}) {
+  const [busy, setBusy] = useState<'allow' | 'allowSimilar' | 'reject' | null>(null);
+  const [error, setError] = useState('');
+  const [rejecting, setRejecting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [understood, setUnderstood] = useState(false);
+  const risk = highRiskApproval(tool, summary);
+  const resolve = async (decision: 'allow' | 'allowSimilar' | 'reject', reason?: string, highRiskAcknowledged = false) => {
+    if (busy) return;
+    setBusy(decision); setError('');
+    try {
+      await api.resolveTaskApproval(target.taskId, target.activityId, {
+        turnId: target.turnId, decision, reason, ...(highRiskAcknowledged ? { highRiskAcknowledged: true } : {}),
+      });
+      setRejecting(false);
+      setConfirming(false);
+      onResolved?.();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : tr('Could not send approval decision.'));
+      setBusy(null);
+    }
   };
-  return <><div className="approval-actions" role="group" aria-label={tr('Approval decision')}>
-    <button type="button" className="approval-allow" disabled={Boolean(busy)} onClick={() => void resolve('allow')}>{busy === 'allow' ? <LoaderCircle className="spin" /> : <Check />}{tr('Allow')}</button>
-    {reusable && <button type="button" className="approval-similar" disabled={Boolean(busy)} onClick={() => void resolve('allowSimilar')}>{busy === 'allowSimilar' ? <LoaderCircle className="spin" /> : <CheckCheck />}{tr('Allow similar')}</button>}
-    <button type="button" className="approval-reject" disabled={Boolean(busy)} onClick={() => setRejecting(true)}><Ban />{tr('Reject')}</button>{error && <p role="alert"><CircleAlert />{error}</p>}
-  </div>{rejecting && <RejectApprovalDialog busy={busy === 'reject'} error={error} close={() => !busy && setRejecting(false)} reject={(reason) => resolve('reject', reason)} />}</>;
+  const closeConfirm = () => { if (!busy) { setConfirming(false); setUnderstood(false); } };
+  return <>
+    {risk && <div className="approval-high-risk-inline"><AlertTriangle aria-hidden="true" /><div>
+      <strong>{tr('High-risk action: {action}', { action: risk.title })}</strong>
+      <p>{tr('Approval requires reviewing the affected files and confirming the consequences.')}</p>
+    </div></div>}
+    <div className="approval-actions" role="group" aria-label={tr('Approval decision')}>
+      <button type="button" className={risk ? 'approval-risk-review' : 'approval-allow'} disabled={Boolean(busy)}
+        onClick={() => { if (risk) { setUnderstood(false); setConfirming(true); } else void resolve('allow'); }}>
+        {busy === 'allow' ? <LoaderCircle className="spin" /> : risk ? <AlertTriangle /> : <Check />}
+        {risk ? tr('Review risk before allowing') : tr('Allow')}
+      </button>
+      {!risk && reusable && <button type="button" className="approval-similar" disabled={Boolean(busy)}
+        onClick={() => void resolve('allowSimilar')}>
+        {busy === 'allowSimilar' ? <LoaderCircle className="spin" /> : <CheckCheck />}{tr('Allow similar')}
+      </button>}
+      <button type="button" className="approval-reject" disabled={Boolean(busy)} onClick={() => setRejecting(true)}><Ban />{tr('Reject')}</button>
+      {error && <p role="alert"><CircleAlert />{error}</p>}
+    </div>
+    {risk && confirming && <Modal title={tr('Confirm high-risk operation')} description={tr('This approval applies to one operation only. Verify the target and consequences.')} close={closeConfirm} dangerous dismissible={false} className="approval-risk-modal">
+      <HighRiskWarning risk={risk} />
+      <label className="approval-risk-acknowledge"><input type="checkbox" checked={understood} disabled={Boolean(busy)}
+        onChange={event => setUnderstood(event.target.checked)} />
+        <span>{tr('I have reviewed the target and understand this operation may lose or overwrite data.')}</span>
+      </label>
+      {error && <p role="alert" className="approval-risk-error">{error}</p>}
+      <div className="modal-actions">
+        <button type="button" className="button secondary" disabled={Boolean(busy)} onClick={closeConfirm}>{tr('Cancel')}</button>
+        <button type="button" className="button danger" disabled={!understood || Boolean(busy)}
+          onClick={() => void resolve('allow', undefined, true)}>
+          {busy === 'allow' ? <LoaderCircle className="spin" /> : <AlertTriangle />} {tr('Confirm and allow once')}
+        </button>
+      </div>
+    </Modal>}
+    {rejecting && <RejectApprovalDialog busy={busy === 'reject'} error={error} close={() => !busy && setRejecting(false)} reject={(reason) => resolve('reject', reason)} />}
+  </>;
 }
 
 function RejectApprovalDialog({ busy, error, close, reject }: { busy: boolean; error: string; close: () => void; reject: (reason?: string) => Promise<void> }) {
