@@ -14,6 +14,10 @@ export interface HighRiskApproval {
   dryRun: boolean;
   contentBytesEstimate: number | null;
   expectedVersion: boolean;
+  commandPreview: string | null;
+  commandReason: string | null;
+  previewTruncated: boolean;
+  previewRedacted: boolean;
 }
 
 /**
@@ -37,7 +41,11 @@ export function highRiskApproval(tool: string | undefined, rawSummary: unknown):
   const summary = rawSummary && typeof rawSummary === 'object' && !Array.isArray(rawSummary)
     ? rawSummary as Record<string, unknown> : {};
   const operation = tool || (typeof summary.operation === 'string' ? summary.operation : '');
-  const details = HIGH_RISK_TOOLS[operation];
+  const command = summary.command && typeof summary.command === 'object'
+    ? summary.command as Record<string, unknown> : {};
+  const serverMarkedShell = ['command_run','shell_create','shell_write'].includes(operation) && summary.highRisk === true;
+  const details = HIGH_RISK_TOOLS[operation] ?? (serverMarkedShell
+    ? ['Review risky command','Shell command or script may delete data or execute code. Verify the command before approving.'] as [string,string] : undefined);
   if (!details) return null;
   const paths = Array.isArray(summary.paths) ? summary.paths.filter((p): p is string => typeof p === 'string' && p.length > 0) : [];
   if (!paths.length) {
@@ -62,5 +70,9 @@ export function highRiskApproval(tool: string | undefined, rawSummary: unknown):
     contentBytesEstimate: typeof summary.contentBytesEstimate === 'number' && Number.isFinite(summary.contentBytesEstimate)
       ? Math.max(0, Math.trunc(summary.contentBytesEstimate)) : null,
     expectedVersion: typeof summary.expectedVersion === 'string' && summary.expectedVersion.length > 0,
+    commandPreview: typeof command.preview === 'string' ? command.preview : null,
+    commandReason: typeof summary.highRiskReason === 'string' ? tr(summary.highRiskReason) : null,
+    previewTruncated: command.previewTruncated === true,
+    previewRedacted: command.previewRedacted === true,
   };
 }

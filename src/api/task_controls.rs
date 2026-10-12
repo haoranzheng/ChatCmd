@@ -37,9 +37,19 @@ pub(crate) fn requires_high_risk_acknowledgement(tool: &str) -> bool {
 fn ensure_high_risk_acknowledgement(
     request: &ApprovalDecisionRequest,
     approved_tool: &str,
+    high_risk: bool,
 ) -> Result<(), Problem> {
+    if (high_risk || requires_high_risk_acknowledgement(approved_tool))
+        && request.decision == "allowSimilar"
+    {
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "High-risk approval is single-use",
+            "Dangerous commands cannot be approved for similar future operations.",
+        ));
+    }
     if request.decision != "reject"
-        && requires_high_risk_acknowledgement(approved_tool)
+        && (high_risk || requires_high_risk_acknowledgement(approved_tool))
         && !request.high_risk_acknowledged
     {
         return Err(Problem::new(
@@ -88,6 +98,10 @@ pub(super) async fn resolve_task_approval(
             .get("tool")
             .and_then(Value::as_str)
             .unwrap_or(""),
+        approval_request
+            .get("highRisk")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
     )?;
     let state_name = match request.decision.as_str() {
         "allow" | "allowSimilar" => "approved",
@@ -527,25 +541,44 @@ mod high_risk_approval_tests {
             "git_push",
         ] {
             assert!(
-                ensure_high_risk_acknowledgement(&request("allow", false), tool).is_err(),
+                ensure_high_risk_acknowledgement(&request("allow", false), tool, false).is_err(),
                 "{tool}"
             );
             assert!(
-                ensure_high_risk_acknowledgement(&request("allow", true), tool).is_ok(),
+                ensure_high_risk_acknowledgement(&request("allow", true), tool, false).is_ok(),
                 "{tool}"
             );
             assert!(
-                ensure_high_risk_acknowledgement(&request("reject", false), tool).is_ok(),
+                ensure_high_risk_acknowledgement(&request("reject", false), tool, false).is_ok(),
                 "{tool}"
             );
         }
-        assert!(ensure_high_risk_acknowledgement(&request("allow", false), "fs_read_text").is_ok());
         assert!(
-            ensure_high_risk_acknowledgement(&request("allow", false), "fs_replace_text").is_ok()
+            ensure_high_risk_acknowledgement(&request("allow", false), "fs_read_text", false)
+                .is_ok()
         );
-        assert!(ensure_high_risk_acknowledgement(&request("allow", false), "command_run").is_ok());
         assert!(
-            ensure_high_risk_acknowledgement(&request("allowSimilar", false), "fs_delete").is_err()
+            ensure_high_risk_acknowledgement(&request("allow", false), "fs_replace_text", false)
+                .is_ok()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", false), "command_run", false)
+                .is_ok()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", false), "command_run", true)
+                .is_err()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", true), "command_run", true).is_ok()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allowSimilar", true), "command_run", true)
+                .is_err()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allowSimilar", false), "fs_delete", false)
+                .is_err()
         );
     }
 }

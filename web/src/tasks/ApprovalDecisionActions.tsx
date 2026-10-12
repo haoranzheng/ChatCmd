@@ -11,6 +11,11 @@ function HighRiskWarning({ risk }: { risk: HighRiskApproval }) {
   return <div className="approval-high-risk-warning" role="alert">
     <div className="approval-high-risk-heading"><AlertTriangle aria-hidden="true" /><strong>{tr('High-risk action: {action}', { action: risk.title })}</strong></div>
     <p>{risk.consequence}</p>
+    {risk.commandReason && <p><strong>{tr('Reason for warning:')}</strong> {risk.commandReason}</p>}
+    {risk.commandPreview && <div className="approval-command-preview"><strong>{tr('Command preview (sensitive values hidden)')}</strong>
+      <pre><code>{risk.commandPreview}</code></pre>
+      {(risk.previewTruncated || risk.previewRedacted) && <p>{tr('Preview shortened or redacted. Consult the exact tool request before allowing.')}</p>}
+    </div>}
     {risk.source && <p><strong>{tr('Source:')}</strong> <code className="approval-high-risk-fullpath">{risk.source}</code></p>}
     {risk.destination && <p><strong>{tr('Destination:')}</strong> <code className="approval-high-risk-fullpath">{risk.destination}</code></p>}
     {risk.operation === 'fs_delete' && <p><strong>{risk.mode === 'quarantine'
@@ -46,6 +51,11 @@ export function ApprovalDecisionActions({ target, onResolved, reusable = true, t
   const [confirming, setConfirming] = useState(false);
   const [understood, setUnderstood] = useState(false);
   const risk = highRiskApproval(tool, summary);
+  const command = summary && typeof summary === 'object' && !Array.isArray(summary)
+    ? (summary as Record<string, unknown>).command : null;
+  const benignPreview = !risk && (['command_run','shell_create','shell_write'].includes(tool ?? ''))
+    && command && typeof command === 'object'
+    ? (command as Record<string, unknown>).preview : null;
   const resolve = async (decision: 'allow' | 'allowSimilar' | 'reject', reason?: string, highRiskAcknowledged = false) => {
     if (busy) return;
     setBusy(decision); setError('');
@@ -67,6 +77,11 @@ export function ApprovalDecisionActions({ target, onResolved, reusable = true, t
       <strong>{tr('High-risk action: {action}', { action: risk.title })}</strong>
       <p>{tr('Approval requires reviewing the affected files and confirming the consequences.')}</p>
     </div></div>}
+    {typeof benignPreview === 'string' && <div className="approval-command-preview">
+      <strong>{tr('Command preview (sensitive values hidden)')}</strong>
+      <pre><code>{benignPreview}</code></pre>
+      <p>{tr('Preview cannot establish that an arbitrary script is safe.')}</p>
+    </div>}
     <div className="approval-actions" role="group" aria-label={tr('Approval decision')}>
       <button type="button" className={risk ? 'approval-risk-review' : 'approval-allow'} disabled={Boolean(busy)}
         onClick={() => { if (risk) { setUnderstood(false); setConfirming(true); } else void resolve('allow'); }}>

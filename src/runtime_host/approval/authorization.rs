@@ -9,7 +9,9 @@ impl RuntimeHost {
             || matches!(tool, "workspace_index_status" | "workspace_index_rebuild")
             || matches!(tool, "workspace_roots" | "project_context");
         let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
-        let high_risk_tool = crate::api::task_controls::requires_high_risk_acknowledgement(tool);
+        let shell_inspection=super::shell_risk::inspect(tool,arguments);
+        let high_risk_tool = crate::api::task_controls::requires_high_risk_acknowledgement(tool)
+            || shell_inspection.as_ref().is_some_and(|inspect|inspect.high_risk);
         let desktop_tool = matches!(tool, "desktop_observe" | "desktop_control");
         let capabilities = tool_capabilities(tool);
         if capabilities.is_permission_change() {
@@ -87,6 +89,12 @@ impl RuntimeHost {
         };
         let operation_digest = operation_digest(tool, &resolved_arguments);
         let mut summary = approval_summary(tool, capabilities.risk_class, &resolved_arguments);
+        // Persist the server-derived assessment as part of the signed-by-identity
+        // request record. The client cannot downgrade this when approving.
+        summary["highRisk"]=json!(high_risk_tool);
+        if let Some(inspect)=shell_inspection.as_ref(){
+            summary["highRiskReason"]=json!(inspect.reason);
+        }
         if let Some(preview) = grant_preview.as_ref() {
             summary["grantPreview"] = preview.clone();
         }
@@ -96,6 +104,7 @@ impl RuntimeHost {
             "tool": tool,
             "turnId": turn_id,
             "riskClass": capabilities.risk_class,
+            "highRisk": high_risk_tool,
             "summary": summary,
             "operationDigest": operation_digest,
             "catalogHash": catalog_hash(),

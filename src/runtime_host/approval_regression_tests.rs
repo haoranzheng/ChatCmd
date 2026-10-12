@@ -456,3 +456,66 @@ async fn allow_all_still_requires_approval_for_explicit_high_risk_tools() {
             .expect("approval recorded");
     assert_eq!(stored, 1);
 }
+
+#[tokio::test]
+async fn allow_all_shell_delete_requires_one_time_approval_and_redacted_preview() {
+    let (host, agent_id, dir) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "danger-shell").await;
+    let task_id = TaskId::new(context.task_id.as_deref().expect("task")).expect("id");
+    host.repository
+        .set_execution_mode(&TaskExecutionMode {
+            task_id: task_id.clone(),
+            mode: ExecutionMode::Allow,
+            updated_at_ms: now_ms(),
+        })
+        .await
+        .expect("allow mode");
+    let risk=host.authorize_execution(&context,"command_run",&json!({
+        "executable":"powershell.exe",
+        "cwd":dir.path(),
+        "arguments":["-NoProfile","-Command","Remove-Item -Recurse C:\\Temp\\example; --token super-secret"],
+    })).await.expect_err("risky shell must need approval even under Allow");
+    assert_eq!(risk.code, "approval_timeout");
+    let request: String =
+        sqlx::query_scalar("SELECT request_json FROM approvals WHERE task_id=? LIMIT 1")
+            .bind(task_id.as_str())
+            .fetch_one(host.repository.pool())
+            .await
+            .expect("approval record");
+    let request: serde_json::Value = serde_json::from_str(&request).expect("valid approval JSON");
+    assert_eq!(request["highRisk"], true);
+    assert_eq!(request["summary"]["highRisk"], true);
+    assert_eq!(request["summary"]["command"]["previewRedacted"], true);
+    assert!(!request.to_string().contains("super-secret"));
+}
+#[tokio::test]
+async fn allow_all_benign_direct_command_does_not_require_approval() {
+    let (host, agent_id, dir) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "benign-shell").await;
+    let task_id = TaskId::new(context.task_id.as_deref().expect("task")).expect("id");
+    host.repository
+        .set_execution_mode(&TaskExecutionMode {
+            task_id: task_id.clone(),
+            mode: ExecutionMode::Allow,
+            updated_at_ms: now_ms(),
+        })
+        .await
+        .expect("allow mode");
+    host.authorize_execution(
+        &context,
+        "command_run",
+        &json!({
+            "executable":"git",
+            "cwd":dir.path(),
+            "arguments":["status","--short"],
+        }),
+    )
+    .await
+    .expect("unflagged command retains allow-all convenience");
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM approvals WHERE task_id=?")
+        .bind(task_id.as_str())
+        .fetch_one(host.repository.pool())
+        .await
+        .expect("count");
+    assert_eq!(count, 0);
+}

@@ -92,31 +92,43 @@ fn desktop_approval_summary(tool: &str, arguments: &Value) -> Option<Value> {
 }
 
 fn command_approval_summary(tool: &str, arguments: &Value) -> Option<Value> {
-    if !matches!(tool, "command_run" | "shell_create") {
+    if !matches!(tool, "command_run" | "shell_create" | "shell_write") {
         return None;
     }
     let executable = arguments
         .get("executable")
         .and_then(Value::as_str)
-        .unwrap_or("<default shell>");
+        .unwrap_or(if tool == "shell_write" {"<active terminal>"} else {"<default shell>"});
     let argument_values = arguments
         .get("arguments")
         .and_then(Value::as_array)
         .map(Vec::as_slice)
         .unwrap_or_default();
+    let inspection=super::shell_risk::inspect(tool,arguments);
     let mut hasher = Sha256::new();
     for argument in argument_values {
         let encoded = canonical_json(argument);
         hasher.update(encoded.len().to_le_bytes());
         hasher.update(encoded.as_bytes());
     }
+    if tool == "shell_write" {
+        // Hash the exact terminal input but never persist the raw text here.
+        if let Some(input) = arguments.get("text") {
+            let encoded=canonical_json(input);
+            hasher.update(encoded.len().to_le_bytes());
+            hasher.update(encoded.as_bytes());
+        }
+    }
     let (executable_preview, executable_truncated) = bounded_preview(executable, 256);
     Some(json!({
         "executable": executable_preview,
         "executableTruncated": executable_truncated,
-        "argumentCount": argument_values.len(),
+        "argumentCount": if tool == "shell_write" {1} else {argument_values.len()},
         "argumentsSha256": format!("sha256:{:x}", hasher.finalize()),
         "argumentsRedacted": true,
+        "preview": inspection.as_ref().map(|item|item.preview.as_str()),
+        "previewTruncated": inspection.as_ref().is_some_and(|item|item.preview_truncated),
+        "previewRedacted": inspection.as_ref().is_some_and(|item|item.preview_redacted),
     }))
 }
 

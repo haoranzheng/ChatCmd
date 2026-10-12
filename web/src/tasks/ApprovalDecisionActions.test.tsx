@@ -37,6 +37,35 @@ describe('ApprovalDecisionActions', () => {
     }));
   });
 
+
+  it('server-marked risky shell requires review and shows a bounded preview', async () => {
+    render(<ApprovalDecisionActions target={target} tool="command_run"
+      summary={{operation:'command_run',highRisk:true,
+        highRiskReason:'Recognized potentially destructive command or overwrite',
+        command:{preview:'powershell.exe -Command Remove-Item C:/temp',previewTruncated:false,previewRedacted:false}}} />);
+    expect(screen.queryByRole('button',{name:/allow similar/i})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button',{name:/review risk before allowing/i}));
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('powershell.exe -Command Remove-Item C:/temp');
+    expect(dialog).toHaveTextContent('Reason for warning');
+    const confirm=screen.getByRole('button',{name:/confirm and allow once/i});
+    expect(confirm).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(confirm);
+    await waitFor(()=>expect(resolveApproval).toHaveBeenCalledWith('task','activity', {
+      turnId:'turn',decision:'allow',reason:undefined,highRiskAcknowledged:true,
+    }));
+  });
+
+  it('benign command approval shows preview but not a scary warning', () => {
+    render(<ApprovalDecisionActions target={target} tool="command_run"
+      summary={{operation:'command_run',highRisk:false,
+        command:{preview:'git status --short',previewRedacted:false}}} />);
+    expect(screen.getByText('git status --short')).toBeInTheDocument();
+    expect(screen.getByRole('button',{name:/^allow$/i})).toBeEnabled();
+    expect(screen.queryByText(/Review risk before allowing/i)).not.toBeInTheDocument();
+  });
+
   it('rejecting a high-risk request needs no acknowledgement', async () => {
     render(<ApprovalDecisionActions target={target} tool="fs_write_raw" summary={{paths:['C:/temp/blob.bin']}} />);
     fireEvent.click(screen.getByRole('button',{name:/^reject$/i}));

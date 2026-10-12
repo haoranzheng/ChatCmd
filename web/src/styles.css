@@ -599,3 +599,10 @@ body{color:var(--text)}
 .approval-risk-acknowledge input{width:20px;height:20px;flex:none;margin-top:1px;accent-color:var(--bad)}
 .approval-risk-error{color:var(--bad);font-size:13px}
 @media(max-width:640px){.approval-high-risk-inline{margin-left:8px}.approval-risk-modal .modal-actions button{flex:1;min-width:145px}}
+
+/* Command preview contains only a bounded server-generated summary; keep it readable. */
+.approval-command-preview{margin:9px 8px;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--surface)}
+.approval-command-preview strong{font-size:12px}
+.approval-command-preview pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:170px;overflow:auto;padding:10px;border-radius:5px;background:var(--surface-2)}
+.approval-command-preview code{font-size:12px;user-select:text}
+.approval-command-preview p{font-size:12px;line-height:1.5}
