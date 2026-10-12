@@ -190,6 +190,8 @@ pub(crate) fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
             get(desktop_config).put(save_desktop_config),
         )
         .route("/desktop/status", get(desktop_status))
+        .route("/desktop/server/start", post(start_desktop_server))
+        .route("/desktop/server/stop", post(stop_desktop_server))
         .route(
             "/settings/interface-font",
             get(interface_font)

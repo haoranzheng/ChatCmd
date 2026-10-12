@@ -101,3 +101,8 @@ Preview builds can now be packaged locally instead of consuming GitHub Release b
 ## Local loopback launcher (optional)
 
 To start and diagnose Windows-MCP on the user desktop without exposing it on the network, use `scripts/windows-mcp-loopback.ps1 -Action Start`, or `-Action Status` for a read-only check. The script uses the fixed 127.0.0.1:8000 Streamable HTTP endpoint and exactly the seven GUI tools; it never installs a service by default. An **explicit** `-Action InstallAtLogin` registers the limited user-level task; `-Action RemoveAtLogin` removes only that task. Do not use the upstream generic `windows-mcp install` if it would expose tools outside this allowlist. This configuration has no general shell or registry tool exposure.
+
+
+### Managed local Windows-MCP service (opt-in)
+
+The authenticated local Security settings now have explicit **Start Windows-MCP locally** and **Stop managed Windows-MCP** actions. Starting is disabled until desktop integration is enabled and saved. The server launches the user-installed `windows-mcp.exe` with arguments specifying only `127.0.0.1`, the saved port, Streamable HTTP and seven allowlisted GUI tools. It verifies MCP initialize/tools-list before marking it managed. It does not install a scheduled task or enable auto-login. Stop only terminates the in-memory PID that this ChatCMD instance launched and revokes desktop trust; an external process listening on the port is never adopted or killed. Local authenticated APIs: `POST /api/local/desktop/server/start` and `/stop`; extension clients cannot access them. No production installation is replaced by this change.

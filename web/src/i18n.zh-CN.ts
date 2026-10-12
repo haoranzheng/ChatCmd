@@ -1,4 +1,13 @@
 export const zhCN: Record<string, string> = {
+  "Start Windows-MCP with seven desktop tools bound only to 127.0.0.1? Screenshots can reveal private content.": "启动仅监听 127.0.0.1 的 Windows-MCP 七种桌面工具？截图可能显示私人内容。",
+  "Stop only the Windows-MCP process started by ChatCMD? This also revokes desktop trust.": "仅停止 ChatCMD 本次启动的 Windows-MCP 进程？这也会撤销桌面信任。",
+  "Windows-MCP control failed.": "Windows-MCP 启动或停止失败。",
+  "Managed Windows-MCP started.": "ChatCMD 已启动 Windows-MCP。",
+  "Managed Windows-MCP stopped.": "ChatCMD 已停止 Windows-MCP。",
+  "Service started by ChatCMD": "服务由 ChatCMD 启动",
+  "External or stopped service; ChatCMD cannot stop unowned processes.": "外部服务或已停止；ChatCMD 不会终止不属于自己的进程。",
+  "Start Windows-MCP locally": "在本机启动 Windows-MCP",
+  "Stop managed Windows-MCP": "停止本机管理的 Windows-MCP",
   "Source:": "来源：",
   "Destination:": "目标：",
   "Recovery: moved to quarantine; restore may be possible until cleanup.": "恢复可能性：文件已移入隔离区，在清理前可能恢复。",

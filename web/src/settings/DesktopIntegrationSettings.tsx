@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { LoaderCircle, Monitor, RefreshCw, ShieldAlert } from 'lucide-react';
+import { LoaderCircle, Monitor, Play, RefreshCw, ShieldAlert, Square } from 'lucide-react';
 import { api } from '../api';
 import { tr } from '../i18n';
 
@@ -51,6 +51,20 @@ export function DesktopIntegrationSettings() {
     catch(reason){setError(reason instanceof Error?reason.message:tr('Connection test failed'));}
     finally{setBusy(false);}
   };
+  const controlServer = async (action:'start'|'stop') => {
+    if(busy||!config) return;
+    const warning = action==='start'
+      ? tr('Start Windows-MCP with seven desktop tools bound only to 127.0.0.1? Screenshots can reveal private content.')
+      : tr('Stop only the Windows-MCP process started by ChatCMD? This also revokes desktop trust.');
+    if(!window.confirm(warning)) return;
+    setBusy(true);setError('');setNotice('');
+    try {
+      if(action==='start') await api.startDesktopServer(); else await api.stopDesktopServer();
+      setStatus(await api.desktopStatus());
+      setNotice(action==='start' ? tr('Managed Windows-MCP started.') : tr('Managed Windows-MCP stopped.'));
+    }catch(reason){setError(reason instanceof Error?reason.message:tr('Windows-MCP control failed.'));}
+    finally{setBusy(false);}
+  };
   return <div className="settings-section-block">
     <div className="settings-section-heading"><div><strong><Monitor />{tr('Windows Desktop Integration v0.1')}</strong><p>{tr('Connect to a local Windows-MCP server. Only the 127.0.0.1 loopback address is supported.')}</p></div></div>
     <div className="settings-control-grid one-column">
@@ -69,12 +83,15 @@ export function DesktopIntegrationSettings() {
         {status.missingTools && status.missingTools.length > 0 && <p>{tr('Missing tools')}: {status.missingTools.join(', ')}</p>}
         {status.repairHints?.map((hint) => <p key={hint}><ShieldAlert aria-hidden="true" />{tr(hint)}</p>)}
         <p><small>{tr('Auto-check every 30 seconds when enabled. This does not start programs or change system settings.')}</small></p>
+        <p><small>{status.managedByChatCmd ? tr('Service started by ChatCMD') : tr('External or stopped service; ChatCMD cannot stop unowned processes.')}</small></p>
       </div>}
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
       <div className="settings-inline-actions">
         <button className="button primary" type="button" disabled={!config||busy||config.port<1||config.port>65535} onClick={()=>void save()}>{busy?<LoaderCircle className="spin"/>:<Monitor/>}{tr('Save desktop integration')}</button>
         <button className="button secondary" type="button" disabled={!config||busy} onClick={()=>void test()}><RefreshCw/>{tr('Test Windows-MCP connection')}</button>
+        <button className="button secondary" type="button" disabled={!config?.enabled||busy||Boolean(status?.connected)} onClick={()=>void controlServer('start')}><Play />{tr('Start Windows-MCP locally')}</button>
+        <button className="button danger" type="button" disabled={busy||!status?.managedByChatCmd} onClick={()=>void controlServer('stop')}><Square />{tr('Stop managed Windows-MCP')}</button>
       </div>
     </div>
   </div>;

@@ -9,7 +9,7 @@ export class ApiError extends Error {
 
 export interface WriteTrust { taskId: string; active: boolean; expiresAtMs: number | null; maxCalls: number; usedCalls: number }
 export interface DesktopTrust { taskId: string; active: boolean; scope: 'none' | 'observe' | 'control'; expiresAtMs: number | null; port?: number }
-export interface DesktopHealth { enabled:boolean; connected:boolean; tools:string[]; checkedAtMs:number; error?:string; missingTools?:string[]; repairHints:string[]; checks:{launcherFound:boolean;portListening:boolean|null} }
+export interface DesktopHealth { enabled:boolean; connected:boolean; managedByChatCmd?:boolean; tools:string[]; checkedAtMs:number; error?:string; missingTools?:string[]; repairHints:string[]; checks:{launcherFound:boolean;portListening:boolean|null} }
 export interface ElevationStatus { supported: boolean; elevated: boolean }
 export interface AuthStatus { configured: boolean; authenticated: boolean; idleTimeoutSeconds: number }
 export interface DatabaseDiagnostics { path: string; tableCount: number; totalRows: number; fileSizeBytes: number; pageCount: number; pageSizeBytes: number; freePageCount: number; usedSizeBytes: number; tables: Array<{ name: string; rowCount: number }> }
@@ -105,6 +105,8 @@ export const api = {
   desktopConfig: () => request<{enabled:boolean;port:number;endpoint:string}>('/api/local/desktop/config'),
   setDesktopConfig: (input:{enabled:boolean;port:number}) => request<{enabled:boolean;port:number;endpoint:string}>('/api/local/desktop/config',{method:'PUT',body:json(input)}),
   desktopStatus: () => request<DesktopHealth>('/api/local/desktop/status'),
+  startDesktopServer: () => request<{started:boolean;managedByChatCmd:boolean;port:number}>('/api/local/desktop/server/start',{method:'POST'}),
+  stopDesktopServer: () => request<{stopped:boolean;managedByChatCmd:boolean;port:number}>('/api/local/desktop/server/stop',{method:'POST'}),
   taskWriteTrust: (id: string) => request<WriteTrust>(`/api/local/tasks/${item(id)}/write-trust`),
   grantTaskWriteTrust: (id: string, durationMinutes:15|60) => request<WriteTrust>(`/api/local/tasks/${item(id)}/write-trust`,{method:'PUT',body:json({durationMinutes})}),
   revokeTaskWriteTrust: (id: string) => request<WriteTrust>(`/api/local/tasks/${item(id)}/write-trust`,{method:'DELETE'}),
