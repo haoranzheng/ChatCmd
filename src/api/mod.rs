@@ -33,7 +33,6 @@ mod custom_fonts;
 mod data;
 mod desktop;
 mod desktop_trust;
-mod write_trust;
 mod folders;
 mod overview;
 mod plan_questions;
@@ -52,6 +51,7 @@ pub(crate) mod task_workspace;
 mod tunnels;
 mod updates;
 mod workspaces;
+mod write_trust;
 
 use overview::default_shell;
 use settings::*;

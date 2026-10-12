@@ -28,7 +28,6 @@ mod subagent_tests;
 mod subagents;
 mod task_serialization;
 mod task_workspace_policy;
-mod write_trust;
 mod terminal_lifecycle;
 mod tool_event_projection;
 mod turn_file_changes;
@@ -39,6 +38,7 @@ mod user_message_path_tests;
 mod user_message_project_tests;
 #[cfg(test)]
 pub(crate) mod user_message_tests;
+mod write_trust;
 
 use chatcmd_core::{LocalDevice, TaskId, TaskStore as _};
 use chatcmd_mcp::RuntimeApi;

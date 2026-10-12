@@ -170,7 +170,10 @@ pub(super) async fn set_task_workspace(
         .bind(&id).bind(now).execute(&mut *tx).await.map_err(db_problem)?;
     // Any workspace binding or access-mode change revokes scoped write trust.
     sqlx::query("DELETE FROM task_write_trust WHERE task_id=?")
-        .bind(&id).execute(&mut *tx).await.map_err(db_problem)?;
+        .bind(&id)
+        .execute(&mut *tx)
+        .await
+        .map_err(db_problem)?;
     // Changing workspace authority must also revoke unattended desktop access.
     sqlx::query("DELETE FROM desktop_task_trust WHERE task_id=?")
         .bind(&id)

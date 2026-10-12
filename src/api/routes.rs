@@ -14,10 +14,10 @@ use crate::websocket::AppState;
 use super::{
     Problem, agents::*, auth::*, chatgpt::*, chatgpt_compact::*, chatgpt_completion::*,
     chatgpt_native::*, chatgpt_observation::*, chatgpt_queue::*, chatgpt_result::*,
-    custom_fonts::*, data::*, desktop::*, desktop_trust::*, write_trust::*, folders::*, overview::*,
+    custom_fonts::*, data::*, desktop::*, desktop_trust::*, folders::*, overview::*,
     plan_questions::*, sessions::*, settings::*, skills::*, subagent_fallback::*, system::*,
     task_controls::*, task_delete::*, task_execution_mode::*, task_views::*, task_workspace::*,
-    tunnels::*, updates::*, workspaces::*,
+    tunnels::*, updates::*, workspaces::*, write_trust::*,
 };
 
 pub(crate) fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
