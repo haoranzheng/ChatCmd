@@ -15,9 +15,9 @@ use super::{
     Problem, agents::*, auth::*, chatgpt::*, chatgpt_compact::*, chatgpt_completion::*,
     chatgpt_native::*, chatgpt_observation::*, chatgpt_queue::*, chatgpt_result::*,
     custom_fonts::*, data::*, desktop::*, desktop_trust::*, folders::*, overview::*,
-    plan_questions::*, sessions::*, settings::*, skills::*, subagent_fallback::*, system::*,
-    task_controls::*, task_delete::*, task_execution_mode::*, task_views::*, task_workspace::*,
-    tunnels::*, updates::*, workspaces::*, write_trust::*,
+    plan_questions::*, sessions::*, settings::*, skill_routing::*, skills::*, subagent_fallback::*,
+    system::*, task_controls::*, task_delete::*, task_execution_mode::*, task_views::*,
+    task_workspace::*, tunnels::*, updates::*, workspaces::*, write_trust::*,
 };
 
 pub(crate) fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
@@ -137,6 +137,7 @@ pub(crate) fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/tasks/{id}", get(task).delete(delete_task))
         .route("/tasks/{id}/activities/{activity_id}", get(task_activity))
         .route("/tasks/{id}/title", axum::routing::put(set_task_title))
+        .route("/tasks/{id}/skill-routing", get(task_skill_routing))
         .route(
             "/tasks/{id}/workspace",
             get(task_workspace).put(set_task_workspace),

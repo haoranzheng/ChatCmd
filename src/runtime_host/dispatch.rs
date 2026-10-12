@@ -425,11 +425,23 @@ impl RuntimeHost {
             ),
             "skill_read" => {
                 let input: SkillInput = parse(arguments)?;
-                value(
-                    self.skills
-                        .read_for_workspace(&input.skill_id, project_folder.as_deref())
-                        .await?,
+                let skill = self
+                    .skills
+                    .read_for_workspace(&input.skill_id, project_folder.as_deref())
+                    .await?;
+                // The audit records a successful read, not skill execution.
+                if let Err(error) = super::skill_routing::record_read(
+                    self.repository.pool(),
+                    &context,
+                    &skill.id,
+                    &skill.source,
+                    skill.truncated,
                 )
+                .await
+                {
+                    tracing::warn!(error=?error, "skill read audit failed");
+                }
+                value(skill)
             }
             "task_get" => {
                 let id = context_task_id(&context)?;

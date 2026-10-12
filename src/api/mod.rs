@@ -39,6 +39,7 @@ mod plan_questions;
 mod routes;
 mod sessions;
 mod settings;
+mod skill_routing;
 mod skills;
 mod subagent_fallback;
 mod subagents;

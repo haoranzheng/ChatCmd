@@ -7,6 +7,10 @@ export class ApiError extends Error {
   constructor(message: string, public status?: number, public problem?: ProblemDetails) { super(message); this.name = 'ApiError'; }
 }
 
+export interface TaskSkillSuggestion {skillId:string;title:string;reason:string;score:number}
+export interface TaskSkillHistory {turnId:string|null;eventType:string;skillId?:string;truncated?:boolean;atMs:number}
+export interface TaskSkillRouting {taskId:string;turnId:string|null;suggestions:TaskSkillSuggestion[];
+  readIds:string[];history:TaskSkillHistory[];adherence:'notVerified'}
 export interface WriteTrust { taskId: string; active: boolean; expiresAtMs: number | null; maxCalls: number; usedCalls: number }
 export interface DesktopTrust { taskId: string; active: boolean; scope: 'none' | 'observe' | 'control'; expiresAtMs: number | null; port?: number }
 export interface DesktopHealth { enabled:boolean; connected:boolean; managedByChatCmd?:boolean; tools:string[]; checkedAtMs:number; error?:string; missingTools?:string[]; repairHints:string[]; checks:{launcherFound:boolean;portListening:boolean|null} }
@@ -107,6 +111,7 @@ export const api = {
   desktopStatus: () => request<DesktopHealth>('/api/local/desktop/status'),
   startDesktopServer: () => request<{started:boolean;managedByChatCmd:boolean;port:number}>('/api/local/desktop/server/start',{method:'POST'}),
   stopDesktopServer: () => request<{stopped:boolean;managedByChatCmd:boolean;port:number}>('/api/local/desktop/server/stop',{method:'POST'}),
+  taskSkillRouting: (id: string) => request<TaskSkillRouting>(`/api/local/tasks/${item(id)}/skill-routing`),
   taskWriteTrust: (id: string) => request<WriteTrust>(`/api/local/tasks/${item(id)}/write-trust`),
   grantTaskWriteTrust: (id: string, durationMinutes:15|60) => request<WriteTrust>(`/api/local/tasks/${item(id)}/write-trust`,{method:'PUT',body:json({durationMinutes})}),
   revokeTaskWriteTrust: (id: string) => request<WriteTrust>(`/api/local/tasks/${item(id)}/write-trust`,{method:'DELETE'}),

@@ -304,6 +304,31 @@ impl RuntimeHost {
         } else {
             Value::Null
         };
+        let skill_routing = match self
+            .skills
+            .list_for_workspace(project_folder.as_deref().map(std::path::Path::new))
+            .await
+        {
+            Ok(available) => {
+                let suggestions = super::skill_routing::rank(content, &available);
+                if inserted > 0 {
+                    if let Err(error) = super::skill_routing::record_recommendations(
+                        self.repository.pool(),
+                        &task_id,
+                        &turn_id,
+                        &suggestions,
+                    )
+                    .await
+                    {
+                        tracing::warn!(error=?error, "skill routing audit failed");
+                    }
+                }
+                json!({"status":"available","suggestions":suggestions,
+                    "instruction":"Recommendations are hints, not proof of skill use. Call skills_list and skill_read to follow matching SKILL.md."})
+            }
+            Err(error) => json!({"status":"unavailable","suggestions":[],
+                "error":error.message,"instruction":"Skill discovery failed; do not invent instructions."}),
+        };
         let subagent_limit = self.subagent_concurrency_limit().await?;
         let explicit_subagent_intent = is_explicit_multi_agent_request(content);
         let intent_hint = intent_hint(content);
@@ -331,6 +356,7 @@ impl RuntimeHost {
             },
             "planMode": is_plan_mode_request(content),
             "intentHint": intent_hint,
+            "skillRouting": skill_routing,
             "isFirstMessage": is_first_message,
             "suggestedTitleRequired": is_first_message,
             "provisionalTitle": is_first_message.then_some(provisional_title),

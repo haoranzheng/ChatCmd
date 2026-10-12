@@ -21,6 +21,7 @@ mod plan_prompt;
 pub(crate) mod plan_prompt_persistence;
 mod queued_messages;
 pub(crate) mod shell_risk;
+mod skill_routing;
 mod subagent_concurrency;
 mod subagent_contract;
 mod subagent_fallback;
