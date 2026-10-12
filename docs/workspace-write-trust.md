@@ -6,7 +6,7 @@ authorization to avoid per-operation confirmations for routine code edits.
 **Default is OFF.** Open task **Access permissions → Trusted workspace edits**.
 Requires local authenticated UI, a bound real conversation scope, a saved project
 with `readWrite` file access, and a non-child task. Duration 15 or 60 minutes;
-maximum 128 successful auto-approved operations. The trust is task-, agent-,
+maximum 128 auto-approved operations. The trust is task-, agent-,
 conversation-, workspace-root- and workspace-revision-bound. Changes to the
 workspace binding or execution mode invalidate it; explicit revocation is immediate.
 

@@ -96,3 +96,8 @@ for trusted conversations and monitor sensitive screens.
 ## Local Windows x64 packaging
 
 Preview builds can now be packaged locally instead of consuming GitHub Release build time. See [Local Windows preview build](local-windows-preview-build.md). Ordinary CI retains platform tests and the GitHub Windows Release ZIP is optional on explicit workflow dispatch.
+
+
+## Local loopback launcher (optional)
+
+To start and diagnose Windows-MCP on the user desktop without exposing it on the network, use `scripts/windows-mcp-loopback.ps1 -Action Start`, or `-Action Status` for a read-only check. The script uses the fixed 127.0.0.1:8000 Streamable HTTP endpoint and exactly the seven GUI tools; it never installs a service by default. An **explicit** `-Action InstallAtLogin` registers the limited user-level task; `-Action RemoveAtLogin` removes only that task. Do not use the upstream generic `windows-mcp install` if it would expose tools outside this allowlist. This configuration has no general shell or registry tool exposure.
