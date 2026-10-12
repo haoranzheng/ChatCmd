@@ -105,6 +105,12 @@ async fn persist_user_execution_mode(
         .execute(&mut *transaction)
         .await
         .map_err(db_problem)?;
+    // Do not retain unattended write permissions across task policy changes.
+    sqlx::query("DELETE FROM task_write_trust WHERE task_id=?")
+        .bind(task_id.as_str())
+        .execute(&mut *transaction)
+        .await
+        .map_err(db_problem)?;
     // An execution-policy change invalidates previously granted unattended desktop trust.
     sqlx::query("DELETE FROM desktop_task_trust WHERE task_id=?")
         .bind(task_id.as_str())

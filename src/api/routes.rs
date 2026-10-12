@@ -14,7 +14,7 @@ use crate::websocket::AppState;
 use super::{
     Problem, agents::*, auth::*, chatgpt::*, chatgpt_compact::*, chatgpt_completion::*,
     chatgpt_native::*, chatgpt_observation::*, chatgpt_queue::*, chatgpt_result::*,
-    custom_fonts::*, data::*, desktop::*, desktop_trust::*, folders::*, overview::*,
+    custom_fonts::*, data::*, desktop::*, desktop_trust::*, write_trust::*, folders::*, overview::*,
     plan_questions::*, sessions::*, settings::*, skills::*, subagent_fallback::*, system::*,
     task_controls::*, task_delete::*, task_execution_mode::*, task_views::*, task_workspace::*,
     tunnels::*, updates::*, workspaces::*,
@@ -140,6 +140,12 @@ pub(crate) fn router(state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route(
             "/tasks/{id}/workspace",
             get(task_workspace).put(set_task_workspace),
+        )
+        .route(
+            "/tasks/{id}/write-trust",
+            get(task_write_trust)
+                .put(set_task_write_trust)
+                .delete(revoke_task_write_trust),
         )
         .route(
             "/tasks/{id}/desktop-trust",

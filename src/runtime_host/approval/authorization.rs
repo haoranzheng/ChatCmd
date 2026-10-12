@@ -62,6 +62,13 @@ impl RuntimeHost {
                 return Ok(());
             }
         }
+        if writes_workspace
+            && crate::runtime_host::write_trust::consume(
+                self.repository.pool(), context, tool, &resolved_arguments,
+            ).await?
+        {
+            return Ok(());
+        }
         if !desktop_tool && capabilities.risk_class.is_safe_read()
             && self
                 .consume_safe_read_grant(context, tool, &resolved_arguments)

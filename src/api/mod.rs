@@ -33,6 +33,7 @@ mod custom_fonts;
 mod data;
 mod desktop;
 mod desktop_trust;
+mod write_trust;
 mod folders;
 mod overview;
 mod plan_questions;

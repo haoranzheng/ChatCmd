@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { tr } from '../i18n';
 import { TaskDesktopTrustCard } from './TaskDesktopTrustCard';
+import { TaskWriteTrustCard } from './TaskWriteTrustCard';
 import type { ApprovalGrant, CommandExecutionMode } from '../types';
 
 export function TaskAccessCard({ taskId, grantTaskId = taskId, defaultMode, grants = [] }: { taskId: string; grantTaskId?: string; defaultMode: CommandExecutionMode; grants?: ApprovalGrant[] }) {
@@ -30,5 +31,5 @@ export function TaskAccessCard({ taskId, grantTaskId = taskId, defaultMode, gran
     {saving && <p className="task-access-feedback" role="status"><LoaderCircle className="spin" aria-hidden="true" />{tr('Applying…')}</p>}
     {error && <p className="task-access-error" id={`task-access-error-${taskId}`} role="alert">{error}</p>}
     {activeGrants.length > 0 && <div className="approval-grant-list"><h4>{tr('Active scoped grants')}</h4>{activeGrants.map((grant) => <div key={grant.id} className="approval-grant-item"><div><strong>{grant.allowedTools.join(', ')}{grant.inheritedFrom ? ` · ${tr('Inherited')}` : ''}</strong><small>{tr('{used} of {total} calls used', { used: grant.usedCalls, total: grant.maxCalls })} · {grant.pathScopes.map((scope) => scope.path).join(', ')}{grant.inheritedFrom ? ` · ${grant.inheritedFrom.slice(0, 8)}…${grant.childAttempt ? ` · #${grant.childAttempt}` : ''}` : ''}</small></div><button type="button" className="button danger compact" onClick={() => void api.revokeTaskApprovalGrant(grantTaskId, grant.id).then(() => setActiveGrants((items) => items.filter((item) => item.id !== grant.id))).catch(() => setError(tr('Could not revoke approval grant.')))}><ShieldX />{tr('Revoke')}</button></div>)}</div>}
-  </section><TaskDesktopTrustCard taskId={taskId} /></>;
+  </section><TaskWriteTrustCard taskId={taskId} /><TaskDesktopTrustCard taskId={taskId} /></>;
 }

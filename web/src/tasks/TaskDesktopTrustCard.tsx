@@ -25,7 +25,7 @@ export function TaskDesktopTrustCard({ taskId }: { taskId: string }) {
       setTrust((current) => current?.expiresAtMs === trust.expiresAtMs
         ? { ...current, active: false, scope: 'none', expiresAtMs: null }
         : current);
-    }, Math.min(60000, Math.max(0, trust.expiresAtMs - Date.now())));
+    }, Math.max(0, trust.expiresAtMs - Date.now()));
     return () => window.clearTimeout(timeout);
   }, [trust]);
 

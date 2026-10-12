@@ -168,6 +168,9 @@ pub(super) async fn set_task_workspace(
         .bind(&id).bind(now).execute(&mut *tx).await.map_err(db_problem)?;
     sqlx::query("WITH RECURSIVE tree(id) AS (SELECT ? UNION SELECT child_task_id FROM subagent_runs JOIN tree ON parent_task_id=tree.id WHERE child_task_id IS NOT NULL) UPDATE approval_grants SET state='revoked',updated_at_ms=? WHERE task_id IN (SELECT id FROM tree) AND state='active'")
         .bind(&id).bind(now).execute(&mut *tx).await.map_err(db_problem)?;
+    // Any workspace binding or access-mode change revokes scoped write trust.
+    sqlx::query("DELETE FROM task_write_trust WHERE task_id=?")
+        .bind(&id).execute(&mut *tx).await.map_err(db_problem)?;
     // Changing workspace authority must also revoke unattended desktop access.
     sqlx::query("DELETE FROM desktop_task_trust WHERE task_id=?")
         .bind(&id)
