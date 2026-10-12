@@ -9,6 +9,7 @@ impl RuntimeHost {
             || matches!(tool, "workspace_index_status" | "workspace_index_rebuild")
             || matches!(tool, "workspace_roots" | "project_context");
         let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
+        let high_risk_tool = crate::api::task_controls::requires_high_risk_acknowledgement(tool);
         let desktop_tool = matches!(tool, "desktop_observe" | "desktop_control");
         let capabilities = tool_capabilities(tool);
         if capabilities.is_permission_change() {
@@ -36,7 +37,7 @@ impl RuntimeHost {
         if scoped_tool {
             self.require_workspace_access(context, tool, arguments).await?;
         }
-        if execution_mode == chatcmd_core::ExecutionMode::Allow && !writes_workspace && !desktop_tool {
+        if execution_mode == chatcmd_core::ExecutionMode::Allow && !writes_workspace && !desktop_tool && !high_risk_tool {
             return Ok(());
         }
 
@@ -156,17 +157,18 @@ impl RuntimeHost {
         .await?;
         self.wait_for_approval(context, &task_id, &approval_id)
             .await?;
-        self.recheck_approved_execution(&mode_task_id, &task_id, &approval_id, &operation_digest, desktop_tool)
+        self.recheck_approved_execution(&mode_task_id, &task_id, &approval_id, &operation_digest, desktop_tool, writes_workspace || high_risk_tool)
             .await
     }
 
-    async fn recheck_approved_execution(
+    pub(in crate::runtime_host) async fn recheck_approved_execution(
         &self,
         mode_task_id: &TaskId,
         task_id: &TaskId,
         approval_id: &str,
         operation_digest: &str,
         desktop_tool: bool,
+        writes_workspace: bool,
     ) -> RuntimeResult<()> {
         let mode = self
             .repository
@@ -179,7 +181,9 @@ impl RuntimeHost {
                 "conversation access mode was revoked before dispatch",
             ));
         }
-        if mode == chatcmd_core::ExecutionMode::Allow && !desktop_tool {
+        // Workspace mutations and high-risk tools always need their exact approved request to remain valid.
+        // Switching to Allow must not bypass a revoked or stale write approval.
+        if mode == chatcmd_core::ExecutionMode::Allow && !desktop_tool && !writes_workspace {
             return Ok(());
         }
         let request_json = sqlx::query_scalar::<_, String>(

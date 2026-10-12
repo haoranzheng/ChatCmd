@@ -16,7 +16,7 @@ export function TaskAccessCard({ taskId, grantTaskId = taskId, defaultMode, gran
   }, [defaultMode, taskId]);
   useEffect(() => setActiveGrants(grants), [grants]);
   async function changeMode(next: CommandExecutionMode) {
-    if (next === mode || saving) return; const previous = mode; setMode(next); setSaving(true); setError('');
+    if (next === mode || saving) return; if (next === 'allowAll' && !window.confirm(tr('Allow everything lets this conversation run shell commands that could delete or overwrite files without per-command confirmation. Continue?'))) return; const previous = mode; setMode(next); setSaving(true); setError('');
     try { const current = await api.setTaskExecutionMode(taskId, next); setMode(current.mode); }
     catch { setMode(previous); setError(tr('Could not change access permissions. Please try again.')); }
     finally { setSaving(false); }

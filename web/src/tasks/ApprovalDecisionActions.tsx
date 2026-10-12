@@ -55,7 +55,7 @@ export function ApprovalDecisionActions({ target, onResolved, reusable = true, t
   };
   const closeConfirm = () => { if (!busy) { setConfirming(false); setUnderstood(false); } };
   return <>
-    {risk && <div className="approval-high-risk-inline"><AlertTriangle aria-hidden="true" /><div>
+    {risk && <div className="approval-high-risk-inline" role="alert"><AlertTriangle aria-hidden="true" /><div>
       <strong>{tr('High-risk action: {action}', { action: risk.title })}</strong>
       <p>{tr('Approval requires reviewing the affected files and confirming the consequences.')}</p>
     </div></div>}

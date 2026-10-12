@@ -1,4 +1,5 @@
 export const zhCN: Record<string, string> = {
+  "Allow everything lets this conversation run shell commands that could delete or overwrite files without per-command confirmation. Continue?": "“允许全部”会使当前对话无需逐次确认即可执行 Shell 命令，命令可能删除或覆盖文件。确定启用吗？",
   "Delete files or folders": "删除文件或文件夹",
   "Files could be removed permanently. Confirm the exact target and deletion mode.": "文件可能被永久删除。请核对目标路径及删除方式。",
   "Move or rename files": "移动或重命名文件",

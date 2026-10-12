@@ -18,12 +18,19 @@ pub(super) struct ApprovalDecisionRequest {
     high_risk_acknowledged: bool,
 }
 
-fn requires_high_risk_acknowledgement(tool: &str) -> bool {
-    matches!(tool,
-        "fs_delete" | "fs_move" | "fs_copy" | "fs_write_raw"
-        | "fs_quarantine_gc" | "fs_restore_quarantine"
-        | "process_kill" | "shell_force_close"
-        | "git_commit" | "git_push"
+pub(crate) fn requires_high_risk_acknowledgement(tool: &str) -> bool {
+    matches!(
+        tool,
+        "fs_delete"
+            | "fs_move"
+            | "fs_copy"
+            | "fs_write_raw"
+            | "fs_quarantine_gc"
+            | "fs_restore_quarantine"
+            | "process_kill"
+            | "shell_force_close"
+            | "git_commit"
+            | "git_push"
     )
 }
 
@@ -77,7 +84,10 @@ pub(super) async fn resolve_task_approval(
     }
     ensure_high_risk_acknowledgement(
         &request,
-        approval_request.get("tool").and_then(Value::as_str).unwrap_or(""),
+        approval_request
+            .get("tool")
+            .and_then(Value::as_str)
+            .unwrap_or(""),
     )?;
     let state_name = match request.decision.as_str() {
         "allow" | "allowSimilar" => "approved",
@@ -505,17 +515,37 @@ mod high_risk_approval_tests {
     #[test]
     fn sensitive_mutations_need_explicit_approval_acknowledgement() {
         for tool in [
-            "fs_delete", "fs_move", "fs_copy", "fs_write_raw",
-            "fs_quarantine_gc", "fs_restore_quarantine",
-            "process_kill", "shell_force_close", "git_commit", "git_push",
+            "fs_delete",
+            "fs_move",
+            "fs_copy",
+            "fs_write_raw",
+            "fs_quarantine_gc",
+            "fs_restore_quarantine",
+            "process_kill",
+            "shell_force_close",
+            "git_commit",
+            "git_push",
         ] {
-            assert!(ensure_high_risk_acknowledgement(&request("allow", false), tool).is_err(), "{tool}");
-            assert!(ensure_high_risk_acknowledgement(&request("allow", true), tool).is_ok(), "{tool}");
-            assert!(ensure_high_risk_acknowledgement(&request("reject", false), tool).is_ok(), "{tool}");
+            assert!(
+                ensure_high_risk_acknowledgement(&request("allow", false), tool).is_err(),
+                "{tool}"
+            );
+            assert!(
+                ensure_high_risk_acknowledgement(&request("allow", true), tool).is_ok(),
+                "{tool}"
+            );
+            assert!(
+                ensure_high_risk_acknowledgement(&request("reject", false), tool).is_ok(),
+                "{tool}"
+            );
         }
         assert!(ensure_high_risk_acknowledgement(&request("allow", false), "fs_read_text").is_ok());
-        assert!(ensure_high_risk_acknowledgement(&request("allow", false), "fs_replace_text").is_ok());
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", false), "fs_replace_text").is_ok()
+        );
         assert!(ensure_high_risk_acknowledgement(&request("allow", false), "command_run").is_ok());
-        assert!(ensure_high_risk_acknowledgement(&request("allowSimilar", false), "fs_delete").is_err());
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allowSimilar", false), "fs_delete").is_err()
+        );
     }
 }

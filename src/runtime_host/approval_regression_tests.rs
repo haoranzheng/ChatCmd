@@ -397,3 +397,62 @@ async fn trusted_desktop_control_skips_individual_approval_only_when_enabled() {
             .0
     );
 }
+
+#[tokio::test]
+async fn mode_allow_does_not_bypass_cancelled_workspace_mutation_approval() {
+    let (host, agent_id, _directory) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "write-recheck").await;
+    let task_id = TaskId::new(context.task_id.as_deref().expect("task")).expect("id");
+    host.repository
+        .set_execution_mode(&TaskExecutionMode {
+            task_id: task_id.clone(),
+            mode: ExecutionMode::Allow,
+            updated_at_ms: now_ms(),
+        })
+        .await
+        .expect("allow mode");
+    let error = host
+        .recheck_approved_execution(
+            &task_id,
+            &task_id,
+            "missing-or-cancelled-write-approval",
+            "sha256:exact",
+            false,
+            true,
+        )
+        .await
+        .expect_err("workspace mutation must keep exact approval record");
+    assert_eq!(error.code, "approval_stale");
+}
+
+#[tokio::test]
+async fn allow_all_still_requires_approval_for_explicit_high_risk_tools() {
+    let (host, agent_id, _dir) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "allow-high-risk").await;
+    let task_id = TaskId::new(context.task_id.as_deref().expect("task")).expect("id");
+    host.repository
+        .set_execution_mode(&TaskExecutionMode {
+            task_id: task_id.clone(),
+            mode: ExecutionMode::Allow,
+            updated_at_ms: now_ms(),
+        })
+        .await
+        .expect("enable allow-all mode");
+    // Process control has no filesystem workspace gate; it must still prompt.
+    let result = host
+        .authorize_execution(&context, "process_kill", &json!({"processId": 12345}))
+        .await;
+    assert_eq!(
+        result
+            .expect_err("high-risk action must not be automatically allowed")
+            .code,
+        "approval_timeout"
+    );
+    let stored: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM approvals WHERE task_id=? AND state='expired'")
+            .bind(task_id.as_str())
+            .fetch_one(host.repository.pool())
+            .await
+            .expect("approval recorded");
+    assert_eq!(stored, 1);
+}

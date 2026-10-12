@@ -402,7 +402,10 @@ mod tests {
 
         // ConPTY + powershell.exe startup on Windows CI can take several seconds.
         // Still assert that no side effect occurred *before* approval above.
-        for _ in 0..1_000 {
+        // Loaded Windows CI runners may need longer to launch ConPTY/PowerShell.
+        // This bounded observation window does not weaken the no-preapproval
+        // side-effect assertion made above.
+        for _ in 0..3_000 {
             if sentinel.exists() {
                 break;
             }
