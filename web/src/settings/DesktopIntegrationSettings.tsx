@@ -26,11 +26,11 @@ export function DesktopIntegrationSettings() {
     catch (reason) { setError(reason instanceof Error ? reason.message : tr('Connection test failed')); }
   }, []);
   useEffect(() => {
-    if (!config?.enabled) return;
+    if (!config) return;
     void diagnose();
     const timer = window.setInterval(() => { void diagnose(); }, 30000);
     return () => window.clearInterval(timer);
-  }, [config?.enabled, config?.port, diagnose]);
+  }, [config, diagnose]);
   const save=async()=>{
     if(!config||busy)return;
     setBusy(true);setError('');setNotice('');setStatus(null);
@@ -39,7 +39,7 @@ export function DesktopIntegrationSettings() {
       const saved=await api.setDesktopConfig({enabled:config.enabled,port:config.port});
       setConfig(saved);
       setNotice(tr('Windows desktop configuration saved.'));
-      if(saved.enabled)setStatus(await api.desktopStatus());
+      setStatus(await api.desktopStatus());
     }catch(reason){
       setError(reason instanceof Error?reason.message:tr('Could not save desktop configuration'));
     }finally{setBusy(false);}

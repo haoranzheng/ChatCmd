@@ -4,7 +4,7 @@ use crate::websocket::AppState;
 use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::{env, path::Path, sync::Arc, time::Duration};
+use std::{env, sync::Arc, time::Duration};
 
 #[cfg(windows)]
 struct OwnedWindowsMcp {
@@ -219,14 +219,31 @@ pub(super) async fn stop_desktop_server(
     #[cfg(windows)]
     {
         let mut guard = owned_server().lock().await;
-        let Some(mut owned) = guard.take() else {
+        let Some(owned) = guard.as_mut() else {
             return Err(Problem::new(
                 StatusCode::CONFLICT,
                 "No managed server",
                 "ChatCMD can stop only Windows-MCP processes it started in this session.",
             ));
         };
-        if matches!(owned.child.try_wait(), Ok(None)) {
+        // Revoke unattended desktop control first. On failure, retain process
+        // ownership so a later stop request can safely retry.
+        sqlx::query("DELETE FROM desktop_task_trust")
+            .execute(state.repository.pool())
+            .await
+            .map_err(db_problem)?;
+        let running = owned
+            .child
+            .try_wait()
+            .map_err(|_| {
+                Problem::new(
+                    StatusCode::BAD_GATEWAY,
+                    "Cannot inspect Windows-MCP",
+                    "The managed process state could not be determined.",
+                )
+            })?
+            .is_none();
+        if running {
             owned.child.kill().await.map_err(|_| {
                 Problem::new(
                     StatusCode::BAD_GATEWAY,
@@ -235,13 +252,10 @@ pub(super) async fn stop_desktop_server(
                 )
             })?;
         }
-        // Stopping the integrated service revokes unattended desktop control.
-        sqlx::query("DELETE FROM desktop_task_trust")
-            .execute(state.repository.pool())
-            .await
-            .map_err(db_problem)?;
+        let port = owned.port;
+        *guard = None;
         Ok(Json(
-            json!({"stopped":true,"managedByChatCmd":false,"port":owned.port}),
+            json!({"stopped":true,"managedByChatCmd":false,"port":port}),
         ))
     }
 }
@@ -380,16 +394,20 @@ pub(super) async fn desktop_status(
 }
 
 fn launcher_found() -> bool {
-    let suffix = if cfg!(windows) { ".exe" } else { "" };
-    env::var_os("PATH").is_some_and(|paths| {
-        env::split_paths(&paths).any(|directory| {
-            ["uvx", "windows-mcp"].iter().any(|name| {
-                Path::new(&directory)
-                    .join(format!("{name}{suffix}"))
-                    .is_file()
+    #[cfg(windows)]
+    {
+        windows_mcp_executable().is_some()
+    }
+    #[cfg(not(windows))]
+    {
+        env::var_os("PATH").is_some_and(|paths| {
+            env::split_paths(&paths).any(|directory| {
+                ["uvx", "windows-mcp"]
+                    .iter()
+                    .any(|name| std::path::Path::new(&directory).join(name).is_file())
             })
         })
-    })
+    }
 }
 
 fn repair_hints(error: &str, listening: bool, launcher: bool) -> Vec<&'static str> {
