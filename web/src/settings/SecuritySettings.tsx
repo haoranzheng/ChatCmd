@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyRound, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { api } from '../api';
 import { tr } from '../i18n';
+import { DesktopIntegrationSettings } from './DesktopIntegrationSettings';
 
 export function SecuritySettings() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -45,5 +46,6 @@ export function SecuritySettings() {
         <div><button className="button primary" disabled={busy || !currentPassword || !newPassword || !confirmPassword} type="button" onClick={() => void submit()}>{busy ? <LoaderCircle className="spin" /> : <KeyRound />}{busy ? tr('Changing…') : tr('Change password')}</button></div>
       </div>
     </div>
+    <DesktopIntegrationSettings />
   </div>;
 }

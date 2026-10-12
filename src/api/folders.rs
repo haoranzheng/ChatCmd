@@ -198,7 +198,7 @@ try {
         if !output.status.success() {
             return Ok(None);
         }
-        return Ok(clean_path(&output.stdout));
+        Ok(clean_path(&output.stdout))
     }
 }
 

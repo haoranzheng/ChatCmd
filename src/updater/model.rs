@@ -103,11 +103,11 @@ impl UpdateTarget {
         let architecture = std::env::consts::ARCH;
         #[cfg(target_os = "windows")]
         {
-            return Self {
+            Self {
                 platform: "windows",
                 architecture,
                 supported: matches!(architecture, "x86_64" | "x86"),
-            };
+            }
         }
         #[cfg(target_os = "macos")]
         {
@@ -191,6 +191,14 @@ mod tests {
         assert!(!is_remote_newer("26.09.03.2206", "26.09.03.2207"));
         assert!(is_remote_newer("26.09.03.2207", "0.1.0"));
         assert!(!is_remote_newer("v.26.09.03", "26.09.03.2207"));
+        assert!(!is_remote_newer(
+            "26.09.03.2207",
+            "26.10.09.0755-preview-12345678"
+        ));
+        assert!(is_remote_newer(
+            "26.10.10.0755",
+            "26.10.09.0755-preview-12345678"
+        ));
     }
 
     #[test]

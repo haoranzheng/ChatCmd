@@ -186,6 +186,28 @@ fn collect_files(root: &Path, current: &Path, output: &mut Vec<PathBuf>) {
     }
 }
 
+// The committed fixture digests use CRLF bytes. Git checkouts on Linux can
+// materialize text fixtures with LF only; canonicalize line endings before
+// hashing so fixture integrity checks are consistent across CI platforms.
+fn canonical_fixture_bytes(bytes: &[u8]) -> Vec<u8> {
+    let mut normalized = Vec::with_capacity(bytes.len());
+    for &byte in bytes {
+        if byte == b'\n' && normalized.last() != Some(&b'\r') {
+            normalized.push(b'\r');
+        }
+        normalized.push(byte);
+    }
+    normalized
+}
+
+#[test]
+fn fixture_hash_normalizes_lf_and_crlf_consistently() {
+    assert_eq!(
+        canonical_fixture_bytes(b"hello\nworld\n"),
+        canonical_fixture_bytes(b"hello\r\nworld\r\n")
+    );
+}
+
 fn fixture_hash(name: &str) -> String {
     let root = fixture_root(name);
     let mut files = Vec::new();
@@ -194,7 +216,8 @@ fn fixture_hash(name: &str) -> String {
     for relative in files {
         digest.update(relative.to_string_lossy().replace('\\', "/").as_bytes());
         digest.update([0]);
-        digest.update(fs::read(root.join(relative)).expect("fixture file must be readable"));
+        let bytes = fs::read(root.join(relative)).expect("fixture file must be readable");
+        digest.update(canonical_fixture_bytes(&bytes));
         digest.update([0]);
     }
     format!("{:x}", digest.finalize())

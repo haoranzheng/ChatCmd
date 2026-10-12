@@ -320,7 +320,7 @@ fn changed_time_ns(_metadata: &fs::Metadata) -> Option<u64> {
 }
 
 #[cfg(windows)]
-fn windows_file_identity(path: &Path) -> RuntimeResult<(u32, u64)> {
+pub(super) fn windows_file_identity(path: &Path) -> RuntimeResult<(u32, u64)> {
     use std::{mem::MaybeUninit, os::windows::io::AsRawHandle as _};
     use windows_sys::Win32::Storage::FileSystem::{
         BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
@@ -825,8 +825,11 @@ mod tests {
         fs::write(&path, "one").expect("write");
         let first =
             fingerprint_identity(&path, &fs::metadata(&path).expect("metadata")).expect("identity");
-        fs::remove_file(&path).expect("remove");
-        fs::write(&path, "two").expect("replace");
+        // Create the replacement while the original inode is still allocated.
+        // Unlink/recreate may legitimately reuse that inode on Linux.
+        let replacement = directory.path().join("replacement");
+        fs::write(&replacement, "two").expect("write replacement");
+        fs::rename(&replacement, &path).expect("atomically replace");
         let second =
             fingerprint_identity(&path, &fs::metadata(&path).expect("metadata")).expect("identity");
         assert_ne!(first, second);

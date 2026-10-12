@@ -9,7 +9,7 @@ export function SubagentApprovalQueue({ approvals, onResolved }: { approvals: Su
     <header><div><CircleAlert aria-hidden="true" /><strong>{tr('A subagent is requesting permission')}</strong></div><span>{tr('{count} requests', { count: approvals.length })}</span></header>
     <div className="subagent-approval-list">{approvals.map((approval) => <article className="subagent-approval-alert" key={`${approval.childTaskId}:${approval.activityId}`}>
       <div className="subagent-approval-copy"><span className="subagent-approval-icon" aria-hidden="true"><Bot /></span><div><strong>{approval.agentName}</strong><p>{tr('requests permission to run')} <code>{approval.tool || 'tool'}</code></p><small><Clock3 /> {formatApprovalInput(approval.input)}</small></div></div>
-      <ApprovalDecisionActions target={{ taskId: approval.childTaskId, activityId: approval.activityId, turnId: approval.childTurnId }} reusable={isSafeReadApproval(approval.input)} onResolved={() => onResolved(approval.activityId)} />
+      <ApprovalDecisionActions target={{ taskId: approval.childTaskId, activityId: approval.activityId, turnId: approval.childTurnId }} tool={approval.tool} summary={approval.input} reusable={isSafeReadApproval(approval.input)} onResolved={() => onResolved(approval.activityId)} />
     </article>)}</div>
   </section>;
 }

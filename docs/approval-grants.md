@@ -1,5 +1,9 @@
 # Scoped approval grants
 
+**Three independent gates:** a managed file write requires a locally bound Workspace Project with `readWrite`, an enabled MCP tool on the agent's allowlist, and a fresh per-operation approval. File write scope cannot be widened by an absolute path parameter, a reusable safe-read grant, or an MCP execution-mode change. Authenticated task rebinding and write revocation invalidate pending approvals and active grants. See [workspace write authorization](workspace-write-authorization.md).
+
+
+
 ChatCMD keeps approval decisions bounded to one agent and task. Child tasks receive no approval
 authority implicitly. A parent may explicitly request a child safe-read grant, but the runtime
 creates it only as a bounded intersection of one active parent grant: requested tools must remain

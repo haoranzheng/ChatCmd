@@ -268,7 +268,7 @@ fn kill_tree(session: &Session) -> RuntimeResult<()> {
         && let Some(pid) = session.process_id
     {
         tree_killed = std::process::Command::new("kill")
-            .args(["-KILL", &format!("-{pid}")])
+            .args(["-s", "KILL", "--", &format!("-{pid}")])
             .output()
             .is_ok_and(|output| output.status.success());
     }

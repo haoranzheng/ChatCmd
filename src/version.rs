@@ -6,10 +6,6 @@ fn embedded_build_version() -> Option<&'static str> {
     option_env!("CHATCMD_BUILD_VERSION").filter(|value| is_valid_version(value))
 }
 
-pub(crate) fn compiled_version() -> &'static str {
-    embedded_build_version().unwrap_or(env!("CARGO_PKG_VERSION"))
-}
-
 pub(crate) fn app_version() -> String {
     select_app_version(
         embedded_build_version(),

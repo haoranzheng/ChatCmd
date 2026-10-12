@@ -96,6 +96,8 @@ Do not repeatedly create failing plugins. If ChatGPT rate-limits plugin creation
 
 Once the plugin is active in a conversation, ChatGPT may not require an explicit `@name` mention for every follow-up.
 
+For existing MCP tasks with no workspace, or when file writes return `permission_change_requires_user`, open the authenticated **local** ChatCMD page, select the conversation, and use **Task information → Workspace scope and file access** to select a saved project and approve **Read-write**. This is separate from the Plugin tool allowlist and per-operation approval. See [Task workspace authorization](workspace-write-authorization.md).
+
 ## 8. Install the optional ChatGPT extension
 
 The unpacked extension improves the ChatGPT web workflow and can surface ChatCMD approvals in the ChatGPT page. It is not required for normal MCP clients.

@@ -197,3 +197,325 @@ async fn nested_child_uses_root_execution_policy() {
         .expect_err("root deny applies");
     assert_eq!(error.code, "policy_denied");
 }
+
+#[tokio::test]
+async fn desktop_trust_is_scoped_to_exact_task_agent_and_port() {
+    let (host, agent_id, _temp) = user_message_tests::test_host().await;
+    let task = task_context(&host, &agent_id, "desktop-trust").await;
+    let task_id = task.task_id.as_deref().expect("task id");
+    let second = task_context(&host, &agent_id, "desktop-untrusted").await;
+    let expiry = now_ms() + 60_000;
+    sqlx::query(
+        "INSERT INTO desktop_task_trust(task_id,agent_id,scope,port,expires_at_ms,updated_at_ms)
+        VALUES(?,?,'observe',8000,?,?)",
+    )
+    .bind(task_id)
+    .bind(&agent_id)
+    .bind(expiry)
+    .bind(now_ms())
+    .execute(host.repository.pool())
+    .await
+    .expect("insert local-only trust");
+    assert!(
+        crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "desktop_observe",
+            8000,
+            Some("desktop-trust")
+        )
+        .await
+        .expect("observe trust")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "desktop_observe",
+            8000,
+            Some("different-conversation")
+        )
+        .await
+        .expect("cross-conversation trust denied")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "desktop_observe",
+            8000,
+            None
+        )
+        .await
+        .expect("unbound conversation trust denied")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "desktop_control",
+            8000,
+            Some("desktop-trust")
+        )
+        .await
+        .expect("control denied")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "desktop_observe",
+            8001,
+            Some("desktop-trust")
+        )
+        .await
+        .expect("different port denied")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            second.task_id.as_deref().unwrap(),
+            &agent_id,
+            "desktop_observe",
+            8000,
+            Some("desktop-trust")
+        )
+        .await
+        .expect("other task denied")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            "wrong-agent",
+            "desktop_observe",
+            8000,
+            Some("desktop-trust")
+        )
+        .await
+        .expect("wrong agent denied")
+    );
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "shell_create",
+            8000,
+            Some("desktop-trust")
+        )
+        .await
+        .expect("non-desktop tool denied")
+    );
+    sqlx::query("UPDATE desktop_task_trust SET scope='control' WHERE task_id=?")
+        .bind(task_id)
+        .execute(host.repository.pool())
+        .await
+        .expect("scope upgrade");
+    assert!(
+        crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "desktop_control",
+            8000,
+            Some("desktop-trust")
+        )
+        .await
+        .unwrap()
+    );
+    sqlx::query("UPDATE desktop_task_trust SET expires_at_ms=0 WHERE task_id=?")
+        .bind(task_id)
+        .execute(host.repository.pool())
+        .await
+        .expect("expire");
+    assert!(
+        !crate::desktop_bridge::is_trusted(
+            host.repository.pool(),
+            task_id,
+            &agent_id,
+            "desktop_observe",
+            8000,
+            Some("desktop-trust")
+        )
+        .await
+        .unwrap()
+    );
+}
+
+#[tokio::test]
+async fn trusted_desktop_control_skips_individual_approval_only_when_enabled() {
+    let (host, agent_id, _temp) = user_message_tests::test_host().await;
+    let mut context = task_context(&host, &agent_id, "desktop-auto-approval").await;
+    context.conversation_scope_id = Some("desktop-auto-approval".to_owned());
+    let task_id = context.task_id.as_deref().expect("task");
+    sqlx::query(
+        "INSERT INTO settings(key,value_json,updated_at_ms) VALUES('desktop_enabled','true',0)",
+    )
+    .execute(host.repository.pool())
+    .await
+    .expect("enable desktop bridge");
+    sqlx::query(
+        "INSERT INTO settings(key,value_json,updated_at_ms) VALUES('desktop_port','8000',0)",
+    )
+    .execute(host.repository.pool())
+    .await
+    .expect("set port");
+    sqlx::query(
+        "INSERT INTO desktop_task_trust(task_id,agent_id,scope,port,expires_at_ms,updated_at_ms)
+         VALUES(?,?,'control',8000,?,?)",
+    )
+    .bind(task_id)
+    .bind(&agent_id)
+    .bind(now_ms() + 60_000)
+    .bind(now_ms())
+    .execute(host.repository.pool())
+    .await
+    .expect("trust current conversation");
+    host.authorize_execution(&context, "desktop_control", &json!({"action":"scroll"}))
+        .await
+        .expect("trusted desktop control must not prompt");
+    let approvals: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM approvals WHERE task_id=?")
+        .bind(task_id)
+        .fetch_one(host.repository.pool())
+        .await
+        .expect("count approvals");
+    assert_eq!(approvals, 0);
+    sqlx::query("UPDATE settings SET value_json='false' WHERE key='desktop_enabled'")
+        .execute(host.repository.pool())
+        .await
+        .expect("disable integration");
+    assert!(
+        !crate::desktop_bridge::config(host.repository.pool())
+            .await
+            .unwrap()
+            .0
+    );
+}
+
+#[tokio::test]
+async fn mode_allow_does_not_bypass_cancelled_workspace_mutation_approval() {
+    let (host, agent_id, _directory) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "write-recheck").await;
+    let task_id = TaskId::new(context.task_id.as_deref().expect("task")).expect("id");
+    host.repository
+        .set_execution_mode(&TaskExecutionMode {
+            task_id: task_id.clone(),
+            mode: ExecutionMode::Allow,
+            updated_at_ms: now_ms(),
+        })
+        .await
+        .expect("allow mode");
+    let error = host
+        .recheck_approved_execution(
+            &task_id,
+            &task_id,
+            "missing-or-cancelled-write-approval",
+            "sha256:exact",
+            false,
+            true,
+        )
+        .await
+        .expect_err("workspace mutation must keep exact approval record");
+    assert_eq!(error.code, "approval_stale");
+}
+
+#[tokio::test]
+async fn allow_all_still_requires_approval_for_explicit_high_risk_tools() {
+    let (host, agent_id, _dir) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "allow-high-risk").await;
+    let task_id = TaskId::new(context.task_id.as_deref().expect("task")).expect("id");
+    host.repository
+        .set_execution_mode(&TaskExecutionMode {
+            task_id: task_id.clone(),
+            mode: ExecutionMode::Allow,
+            updated_at_ms: now_ms(),
+        })
+        .await
+        .expect("enable allow-all mode");
+    // Process control has no filesystem workspace gate; it must still prompt.
+    let result = host
+        .authorize_execution(&context, "process_kill", &json!({"processId": 12345}))
+        .await;
+    assert_eq!(
+        result
+            .expect_err("high-risk action must not be automatically allowed")
+            .code,
+        "approval_timeout"
+    );
+    let stored: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM approvals WHERE task_id=? AND state='expired'")
+            .bind(task_id.as_str())
+            .fetch_one(host.repository.pool())
+            .await
+            .expect("approval recorded");
+    assert_eq!(stored, 1);
+}
+
+#[tokio::test]
+async fn allow_all_shell_delete_requires_one_time_approval_and_redacted_preview() {
+    let (host, agent_id, dir) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "danger-shell").await;
+    let task_id = TaskId::new(context.task_id.as_deref().expect("task")).expect("id");
+    host.repository
+        .set_execution_mode(&TaskExecutionMode {
+            task_id: task_id.clone(),
+            mode: ExecutionMode::Allow,
+            updated_at_ms: now_ms(),
+        })
+        .await
+        .expect("allow mode");
+    let risk=host.authorize_execution(&context,"command_run",&json!({
+        "executable":"powershell.exe",
+        "cwd":dir.path(),
+        "arguments":["-NoProfile","-Command","Remove-Item -Recurse C:\\Temp\\example; --token super-secret"],
+    })).await.expect_err("risky shell must need approval even under Allow");
+    assert_eq!(risk.code, "approval_timeout");
+    let request: String =
+        sqlx::query_scalar("SELECT request_json FROM approvals WHERE task_id=? LIMIT 1")
+            .bind(task_id.as_str())
+            .fetch_one(host.repository.pool())
+            .await
+            .expect("approval record");
+    let request: serde_json::Value = serde_json::from_str(&request).expect("valid approval JSON");
+    assert_eq!(request["highRisk"], true);
+    assert_eq!(request["summary"]["highRisk"], true);
+    assert_eq!(request["summary"]["command"]["previewRedacted"], true);
+    assert!(!request.to_string().contains("super-secret"));
+}
+#[tokio::test]
+async fn allow_all_benign_direct_command_does_not_require_approval() {
+    let (host, agent_id, dir) = user_message_tests::test_host().await;
+    let context = task_context(&host, &agent_id, "benign-shell").await;
+    let task_id = TaskId::new(context.task_id.as_deref().expect("task")).expect("id");
+    host.repository
+        .set_execution_mode(&TaskExecutionMode {
+            task_id: task_id.clone(),
+            mode: ExecutionMode::Allow,
+            updated_at_ms: now_ms(),
+        })
+        .await
+        .expect("allow mode");
+    host.authorize_execution(
+        &context,
+        "command_run",
+        &json!({
+            "executable":"git",
+            "cwd":dir.path(),
+            "arguments":["status","--short"],
+        }),
+    )
+    .await
+    .expect("unflagged command retains allow-all convenience");
+    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM approvals WHERE task_id=?")
+        .bind(task_id.as_str())
+        .fetch_one(host.repository.pool())
+        .await
+        .expect("count");
+    assert_eq!(count, 0);
+}

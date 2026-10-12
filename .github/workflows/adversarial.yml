@@ -8,6 +8,9 @@ on:
 
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-workspace-r5-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   tier-0:
@@ -21,7 +24,21 @@ jobs:
           components: rustfmt
       - run: cargo fmt --all -- --check
       - run: cargo check --workspace --all-targets
-      - run: cargo test --workspace
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix web
+      # The workspace CI already runs the complete Rust suite on Windows and
+      # Linux. Tier 0 focuses on the distinct security regression contracts.
+      - run: timeout --signal=TERM --kill-after=10s 900s cargo test -p chatcmd-runtime --test adversarial_filesystem -- --nocapture
+        env:
+          RUST_TEST_THREADS: '2'
+      - run: timeout --signal=TERM --kill-after=10s 900s cargo test -p chatcmd-runtime --test mutation_safety -- --nocapture
+        env:
+          RUST_TEST_THREADS: '2'
+      - run: timeout --signal=TERM --kill-after=10s 900s cargo test -p chatcmd-mcp --test release_catalog_smoke -- --nocapture
+        env:
+          RUST_TEST_THREADS: '2'
 
   tier-1-platform:
     name: Tier 1 / ${{ matrix.os }}

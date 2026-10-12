@@ -375,7 +375,7 @@ async fn kill_process_tree(pid: u32) {
 #[cfg(unix)]
 async fn kill_process_tree(pid: u32) {
     let _ = Command::new("kill")
-        .args(["-KILL", &format!("-{pid}")])
+        .args(["-s", "KILL", "--", &format!("-{pid}")])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

@@ -14,6 +14,51 @@ pub(super) struct ApprovalDecisionRequest {
     turn_id: Option<String>,
     decision: String,
     reason: Option<String>,
+    #[serde(default)]
+    high_risk_acknowledged: bool,
+}
+
+pub(crate) fn requires_high_risk_acknowledgement(tool: &str) -> bool {
+    matches!(
+        tool,
+        "fs_delete"
+            | "fs_move"
+            | "fs_copy"
+            | "fs_write_raw"
+            | "fs_quarantine_gc"
+            | "fs_restore_quarantine"
+            | "process_kill"
+            | "shell_force_close"
+            | "git_commit"
+            | "git_push"
+    )
+}
+
+fn ensure_high_risk_acknowledgement(
+    request: &ApprovalDecisionRequest,
+    approved_tool: &str,
+    high_risk: bool,
+) -> Result<(), Problem> {
+    if (high_risk || requires_high_risk_acknowledgement(approved_tool))
+        && request.decision == "allowSimilar"
+    {
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "High-risk approval is single-use",
+            "Dangerous commands cannot be approved for similar future operations.",
+        ));
+    }
+    if request.decision != "reject"
+        && (high_risk || requires_high_risk_acknowledgement(approved_tool))
+        && !request.high_risk_acknowledged
+    {
+        return Err(Problem::new(
+            StatusCode::BAD_REQUEST,
+            "High-risk approval requires explicit acknowledgement",
+            "Review the affected paths and consequences, then explicitly confirm the high-risk operation in the local UI.",
+        ));
+    }
+    Ok(())
 }
 
 pub(super) async fn resolve_task_approval(
@@ -47,6 +92,17 @@ pub(super) async fn resolve_task_approval(
             "The turn ID does not own this approval request.",
         ));
     }
+    ensure_high_risk_acknowledgement(
+        &request,
+        approval_request
+            .get("tool")
+            .and_then(Value::as_str)
+            .unwrap_or(""),
+        approval_request
+            .get("highRisk")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    )?;
     let state_name = match request.decision.as_str() {
         "allow" | "allowSimilar" => "approved",
         "reject" => "rejected",
@@ -457,4 +513,72 @@ pub(super) async fn stop_conversation(
     event.task_id = Some(id.to_owned());
     state.publish(event);
     task_detail(state, id).await
+}
+
+#[cfg(test)]
+mod high_risk_approval_tests {
+    use super::*;
+    fn request(decision: &str, high_risk_acknowledged: bool) -> ApprovalDecisionRequest {
+        ApprovalDecisionRequest {
+            turn_id: None,
+            decision: decision.to_string(),
+            reason: None,
+            high_risk_acknowledged,
+        }
+    }
+    #[test]
+    fn sensitive_mutations_need_explicit_approval_acknowledgement() {
+        for tool in [
+            "fs_delete",
+            "fs_move",
+            "fs_copy",
+            "fs_write_raw",
+            "fs_quarantine_gc",
+            "fs_restore_quarantine",
+            "process_kill",
+            "shell_force_close",
+            "git_commit",
+            "git_push",
+        ] {
+            assert!(
+                ensure_high_risk_acknowledgement(&request("allow", false), tool, false).is_err(),
+                "{tool}"
+            );
+            assert!(
+                ensure_high_risk_acknowledgement(&request("allow", true), tool, false).is_ok(),
+                "{tool}"
+            );
+            assert!(
+                ensure_high_risk_acknowledgement(&request("reject", false), tool, false).is_ok(),
+                "{tool}"
+            );
+        }
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", false), "fs_read_text", false)
+                .is_ok()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", false), "fs_replace_text", false)
+                .is_ok()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", false), "command_run", false)
+                .is_ok()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", false), "command_run", true)
+                .is_err()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allow", true), "command_run", true).is_ok()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allowSimilar", true), "command_run", true)
+                .is_err()
+        );
+        assert!(
+            ensure_high_risk_acknowledgement(&request("allowSimilar", false), "fs_delete", false)
+                .is_err()
+        );
+    }
 }

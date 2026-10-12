@@ -369,7 +369,7 @@ function ActivityRow({ activity, taskId, onStop }: { activity: ToolActivity; tas
       <ChevronDown className="activity-chevron" aria-hidden="true" />
     </button>
     {stoppable && <button type="button" className="activity-stop-button" aria-label={tr('Stop {name}', { name: activityLabel(activity) })} onClick={(event) => { event.preventDefault(); event.stopPropagation(); onStop(activity); }}><CircleStop aria-hidden="true" /><span>{tr('Stop')}</span></button>}
-    {approvalPending && taskId && <ApprovalDecisionActions target={{ taskId, activityId: activity.id, turnId: activity.turnId }} reusable={isSafeReadApproval(activity.input)} />}
+    {approvalPending && taskId && <ApprovalDecisionActions target={{ taskId, activityId: activity.id, turnId: activity.turnId }} tool={activity.tool} summary={activity.input} reusable={isSafeReadApproval(activity.input)} />}
     {open && <Modal className="tool-activity-modal" title={activityLabel(activity)} description={`${formatClockTime(activity.startedAt)} · ${activityDuration(activity.startedAt, activity.finishedAt ?? new Date().toISOString())}`} close={closePopup}>
       {detailLoading
         ? <div className="activity-popup-content"><div className="activity-detail-loading" role="status"><LoaderCircle className="spin" aria-hidden="true" /><span>{tr('Loading…')}</span></div></div>

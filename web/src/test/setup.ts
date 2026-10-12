@@ -13,6 +13,9 @@ const testStorage: Storage = {
 };
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: testStorage });
 Object.defineProperty(window, 'localStorage', { configurable: true, value: testStorage });
+// jsdom omits Element.scrollTo; delayed requestAnimationFrame UI callbacks may
+// otherwise throw after an otherwise successful test completes.
+Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, writable: true, value: vi.fn() });
 
 afterEach(() => { cleanup(); storageState.clear(); vi.useRealTimers(); });
 Object.defineProperty(window, 'matchMedia', { writable: true, value: vi.fn().mockImplementation(() => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() })) });

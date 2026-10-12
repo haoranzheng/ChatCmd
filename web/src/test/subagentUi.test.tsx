@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { TasksPage } from '../pages/TasksPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { api } from '../api';
-import { setAppLanguage } from '../i18n';
+import { setAppLanguage, tr } from '../i18n';
 import { subagentTreeRows } from '../tasks/subagentPresentation';
 import type { SubagentRun, TimelineEvent } from '../types';
 // Actual overflow/scroll geometry is verified in scripts/check-task-detail-layout.mjs.
@@ -46,7 +46,7 @@ describe('subagent tree and chat layout', () => {
     expect(topbar).toHaveAttribute('tabindex', '0');
     expect(topbar.nextElementSibling).toHaveClass('task-chat-column');
     expect(screen.getByTestId('turn-children')).toHaveTextContent('child, grandchild');
-    fireEvent.click(screen.getByRole('button', { name: 'Đóng thông tin task' }));
+    fireEvent.click(screen.getByRole('button', { name: tr('Close task information') }));
     expect(container.querySelector('.task-detail-sidebar')).toBeNull();
     expect(container.querySelector('.task-detail-shell')).toHaveClass('sidebar-collapsed');
   });

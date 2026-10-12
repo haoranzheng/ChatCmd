@@ -5,6 +5,14 @@ impl RuntimeHost {
         tool: &str,
         arguments: &Value,
     ) -> RuntimeResult<()> {
+        let scoped_tool = tool.starts_with("fs_") || tool.starts_with("git_")
+            || matches!(tool, "workspace_index_status" | "workspace_index_rebuild")
+            || matches!(tool, "workspace_roots" | "project_context");
+        let writes_workspace = super::task_workspace_policy::is_workspace_write_tool(tool);
+        let shell_inspection=super::shell_risk::inspect(tool,arguments);
+        let high_risk_tool = crate::api::task_controls::requires_high_risk_acknowledgement(tool)
+            || shell_inspection.as_ref().is_some_and(|inspect|inspect.high_risk);
+        let desktop_tool = matches!(tool, "desktop_observe" | "desktop_control");
         let capabilities = tool_capabilities(tool);
         if capabilities.is_permission_change() {
             return Err(RuntimeError::new(
@@ -13,31 +21,58 @@ impl RuntimeHost {
             ));
         }
         if !capabilities.is_execution_policy_controlled() {
+            if scoped_tool {
+                self.require_workspace_access(context, tool, arguments).await?;
+            }
             return Ok(());
         }
         let task_id = TaskId::new(context.task_id.as_deref().unwrap_or_default())
             .map_err(|error| invalid("taskId", error))?;
         let mode_task_id = self.execution_mode_task_id(&task_id).await?;
-        match self
-            .repository
-            .execution_mode(Some(&mode_task_id))
-            .await
-            .map_err(storage_error)?
-        {
-            chatcmd_core::ExecutionMode::Allow => return Ok(()),
-            chatcmd_core::ExecutionMode::Deny => {
-                return Err(RuntimeError::new(
-                    "policy_denied",
-                    "conversation access mode denied this operation",
-                ));
-            }
-            chatcmd_core::ExecutionMode::Approval => {}
+        let execution_mode = self.repository.execution_mode(Some(&mode_task_id))
+            .await.map_err(storage_error)?;
+        // An explicit task/root Deny wins before any missing-workspace recovery error.
+        if execution_mode == chatcmd_core::ExecutionMode::Deny {
+            return Err(RuntimeError::new("policy_denied",
+                "conversation access mode denied this operation"));
+        }
+        if scoped_tool {
+            self.require_workspace_access(context, tool, arguments).await?;
+        }
+        if execution_mode == chatcmd_core::ExecutionMode::Allow && !writes_workspace && !desktop_tool && !high_risk_tool {
+            return Ok(());
         }
 
         let resolved_arguments = self
             .resolve_approval_paths(context, tool, arguments)
             .await?;
-        if capabilities.risk_class.is_safe_read()
+        // Local-UI trust is strictly bound to this task and agent. It never
+        // inherits to child tasks, and it does not override Deny or the tool
+        // catalog allowlist checked by the outer runtime call.
+        if desktop_tool {
+            let (enabled, port) = crate::desktop_bridge::config(self.repository.pool()).await?;
+            if enabled
+                && crate::desktop_bridge::is_trusted(
+                    self.repository.pool(),
+                    task_id.as_str(),
+                    &context.agent_id,
+                    tool,
+                    port,
+                    context.conversation_scope_id.as_deref(),
+                )
+                .await?
+            {
+                return Ok(());
+            }
+        }
+        if writes_workspace
+            && crate::runtime_host::write_trust::consume(
+                self.repository.pool(), context, tool, &resolved_arguments,
+            ).await?
+        {
+            return Ok(());
+        }
+        if !desktop_tool && capabilities.risk_class.is_safe_read()
             && self
                 .consume_safe_read_grant(context, tool, &resolved_arguments)
                 .await?
@@ -47,13 +82,19 @@ impl RuntimeHost {
 
         let approval_id = context.request_id.clone();
         let turn_id = context.turn_id.as_deref().unwrap_or_default();
-        let grant_preview = if capabilities.risk_class.is_safe_read() {
+        let grant_preview = if capabilities.risk_class.is_safe_read() && !desktop_tool {
             Some(self.safe_read_grant_preview(context, tool).await?)
         } else {
             None
         };
         let operation_digest = operation_digest(tool, &resolved_arguments);
         let mut summary = approval_summary(tool, capabilities.risk_class, &resolved_arguments);
+        // Persist the server-derived assessment as part of the signed-by-identity
+        // request record. The client cannot downgrade this when approving.
+        summary["highRisk"]=json!(high_risk_tool);
+        if let Some(inspect)=shell_inspection.as_ref(){
+            summary["highRiskReason"]=json!(inspect.reason);
+        }
         if let Some(preview) = grant_preview.as_ref() {
             summary["grantPreview"] = preview.clone();
         }
@@ -63,6 +104,7 @@ impl RuntimeHost {
             "tool": tool,
             "turnId": turn_id,
             "riskClass": capabilities.risk_class,
+            "highRisk": high_risk_tool,
             "summary": summary,
             "operationDigest": operation_digest,
             "catalogHash": catalog_hash(),
@@ -124,16 +166,18 @@ impl RuntimeHost {
         .await?;
         self.wait_for_approval(context, &task_id, &approval_id)
             .await?;
-        self.recheck_approved_execution(&mode_task_id, &task_id, &approval_id, &operation_digest)
+        self.recheck_approved_execution(&mode_task_id, &task_id, &approval_id, &operation_digest, desktop_tool, writes_workspace || high_risk_tool)
             .await
     }
 
-    async fn recheck_approved_execution(
+    pub(in crate::runtime_host) async fn recheck_approved_execution(
         &self,
         mode_task_id: &TaskId,
         task_id: &TaskId,
         approval_id: &str,
         operation_digest: &str,
+        desktop_tool: bool,
+        writes_workspace: bool,
     ) -> RuntimeResult<()> {
         let mode = self
             .repository
@@ -146,7 +190,9 @@ impl RuntimeHost {
                 "conversation access mode was revoked before dispatch",
             ));
         }
-        if mode == chatcmd_core::ExecutionMode::Allow {
+        // Workspace mutations and high-risk tools always need their exact approved request to remain valid.
+        // Switching to Allow must not bypass a revoked or stale write approval.
+        if mode == chatcmd_core::ExecutionMode::Allow && !desktop_tool && !writes_workspace {
             return Ok(());
         }
         let request_json = sqlx::query_scalar::<_, String>(
@@ -268,7 +314,7 @@ impl RuntimeHost {
             .iter()
             .filter(|name| {
                 let capabilities = tool_capabilities(name);
-                capabilities.approval_required && capabilities.risk_class.is_safe_read()
+                capabilities.approval_required && capabilities.risk_class.is_safe_read() && !name.starts_with("desktop_")
             })
             .cloned()
             .collect::<Vec<_>>();
