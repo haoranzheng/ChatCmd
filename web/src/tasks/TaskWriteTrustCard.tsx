@@ -9,7 +9,7 @@ export function TaskWriteTrustCard({ taskId }: { taskId: string }) {
   const [durationMinutes, setDuration] = useState<15 | 60>(60);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(0);
   const [refresh, setRefresh] = useState(0);
   useEffect(() => {
     let active = true;

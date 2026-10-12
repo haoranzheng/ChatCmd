@@ -6,7 +6,6 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{env, path::Path, sync::Arc, time::Duration};
 
-
 #[cfg(windows)]
 struct OwnedWindowsMcp {
     port: u16,
@@ -15,7 +14,8 @@ struct OwnedWindowsMcp {
 
 #[cfg(windows)]
 fn owned_server() -> &'static tokio::sync::Mutex<Option<OwnedWindowsMcp>> {
-    static OWNED: std::sync::OnceLock<tokio::sync::Mutex<Option<OwnedWindowsMcp>>> = std::sync::OnceLock::new();
+    static OWNED: std::sync::OnceLock<tokio::sync::Mutex<Option<OwnedWindowsMcp>>> =
+        std::sync::OnceLock::new();
     OWNED.get_or_init(|| tokio::sync::Mutex::new(None))
 }
 
@@ -24,7 +24,12 @@ fn windows_mcp_executable() -> Option<std::path::PathBuf> {
     let name = "windows-mcp.exe";
     let mut candidates = Vec::new();
     if let Some(home) = env::var_os("USERPROFILE") {
-        candidates.push(std::path::PathBuf::from(home).join(".local").join("bin").join(name));
+        candidates.push(
+            std::path::PathBuf::from(home)
+                .join(".local")
+                .join("bin")
+                .join(name),
+        );
     }
     if let Some(path) = env::var_os("PATH") {
         candidates.extend(env::split_paths(&path).map(|p| p.join(name)));
@@ -32,25 +37,42 @@ fn windows_mcp_executable() -> Option<std::path::PathBuf> {
     candidates.into_iter().find(|path| path.is_file())
 }
 
+#[cfg(any(windows, test))]
 fn limited_start_args(port: u16) -> Vec<String> {
-    ["serve", "--transport", "streamable-http", "--host", "127.0.0.1", "--port"]
-        .into_iter().map(str::to_owned)
-        .chain([port.to_string(), "--tools".to_owned(), "Snapshot,Screenshot,Click,Type,Scroll,Shortcut,App".to_owned()])
-        .collect()
+    [
+        "serve",
+        "--transport",
+        "streamable-http",
+        "--host",
+        "127.0.0.1",
+        "--port",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .chain([
+        port.to_string(),
+        "--tools".to_owned(),
+        "Snapshot,Screenshot,Click,Type,Scroll,Shortcut,App".to_owned(),
+    ])
+    .collect()
 }
 
 #[cfg(windows)]
 async fn managed_server_active() -> bool {
-    let mut guard=owned_server().lock().await;
-    if let Some(owned)=guard.as_mut() {
-        if matches!(owned.child.try_wait(), Ok(None)) {return true;}
+    let mut guard = owned_server().lock().await;
+    if let Some(owned) = guard.as_mut() {
+        if matches!(owned.child.try_wait(), Ok(None)) {
+            return true;
+        }
     }
-    *guard=None;
+    *guard = None;
     false
 }
 
 #[cfg(not(windows))]
-async fn managed_server_active() -> bool { false }
+async fn managed_server_active() -> bool {
+    false
+}
 
 /// Explicit authenticated local UI request. Never starts a service on boot or
 /// exposes Windows-MCP beyond the Windows user session's loopback interface.
@@ -60,59 +82,123 @@ pub(super) async fn start_desktop_server(
     #[cfg(not(windows))]
     {
         let _ = state;
-        Err(Problem::new(StatusCode::NOT_IMPLEMENTED, "Windows only", "Windows-MCP can only be launched on Windows."))
+        Err(Problem::new(
+            StatusCode::NOT_IMPLEMENTED,
+            "Windows only",
+            "Windows-MCP can only be launched on Windows.",
+        ))
     }
     #[cfg(windows)]
     {
-        let (enabled,port)=crate::desktop_bridge::config(state.repository.pool()).await.map_err(|_| Problem::new(
-            StatusCode::INTERNAL_SERVER_ERROR,"Desktop configuration unavailable","Unable to inspect desktop configuration."))?;
-        if !enabled {return Err(Problem::new(StatusCode::CONFLICT,"Desktop integration disabled",
-            "Enable and save desktop integration before starting Windows-MCP."));}
-        if !crate::desktop_bridge::allowed_port(port,Some(state.port)) {
-            return Err(Problem::new(StatusCode::BAD_REQUEST,"Invalid desktop port","Configured port conflicts with ChatCMD."));
+        let (enabled, port) = crate::desktop_bridge::config(state.repository.pool())
+            .await
+            .map_err(|_| {
+                Problem::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Desktop configuration unavailable",
+                    "Unable to inspect desktop configuration.",
+                )
+            })?;
+        if !enabled {
+            return Err(Problem::new(
+                StatusCode::CONFLICT,
+                "Desktop integration disabled",
+                "Enable and save desktop integration before starting Windows-MCP.",
+            ));
         }
-        let mut guard=owned_server().lock().await;
-        if let Some(owned)=guard.as_mut() {
-            if matches!(owned.child.try_wait(),Ok(None)) {
-                if owned.port==port {return Ok(Json(json!({"started":true,"managedByChatCmd":true,"alreadyRunning":true,"port":port})));}
-                return Err(Problem::new(StatusCode::CONFLICT,"Managed server already running","Stop the managed server before changing its port."));
+        if !crate::desktop_bridge::allowed_port(port, Some(state.port)) {
+            return Err(Problem::new(
+                StatusCode::BAD_REQUEST,
+                "Invalid desktop port",
+                "Configured port conflicts with ChatCMD.",
+            ));
+        }
+        let mut guard = owned_server().lock().await;
+        if let Some(owned) = guard.as_mut() {
+            if matches!(owned.child.try_wait(), Ok(None)) {
+                if owned.port == port {
+                    return Ok(Json(
+                        json!({"started":true,"managedByChatCmd":true,"alreadyRunning":true,"port":port}),
+                    ));
+                }
+                return Err(Problem::new(
+                    StatusCode::CONFLICT,
+                    "Managed server already running",
+                    "Stop the managed server before changing its port.",
+                ));
             }
         }
-        *guard=None;
-        if tokio::net::TcpStream::connect(("127.0.0.1",port)).await.is_ok() {
-            return Err(Problem::new(StatusCode::CONFLICT,"Desktop port occupied",
-                "Another process owns the configured port. ChatCMD will not take control of it."));
+        *guard = None;
+        if tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .is_ok()
+        {
+            return Err(Problem::new(
+                StatusCode::CONFLICT,
+                "Desktop port occupied",
+                "Another process owns the configured port. ChatCMD will not take control of it.",
+            ));
         }
-        let executable=windows_mcp_executable().ok_or_else(||Problem::new(
-            StatusCode::NOT_FOUND,"Windows-MCP launcher missing",
-            "Install windows-mcp.exe or add the installed launcher to PATH."))?;
-        let mut command=tokio::process::Command::new(executable);
+        let executable = windows_mcp_executable().ok_or_else(|| {
+            Problem::new(
+                StatusCode::NOT_FOUND,
+                "Windows-MCP launcher missing",
+                "Install windows-mcp.exe or add the installed launcher to PATH.",
+            )
+        })?;
+        let mut command = tokio::process::Command::new(executable);
         command.args(limited_start_args(port));
-        command.stdin(std::process::Stdio::null())
+        command
+            .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null());
-        use std::os::windows::process::CommandExt as _;
         command.creation_flags(0x08000000); // CREATE_NO_WINDOW
-        let mut child=command.spawn().map_err(|_|Problem::new(StatusCode::BAD_GATEWAY,
-            "Windows-MCP startup failed","The user-session launcher could not start."))?;
-        let mut healthy=false;
+        let mut child = command.spawn().map_err(|_| {
+            Problem::new(
+                StatusCode::BAD_GATEWAY,
+                "Windows-MCP startup failed",
+                "The user-session launcher could not start.",
+            )
+        })?;
+        let mut healthy = false;
         for _ in 0..20 {
             tokio::time::sleep(Duration::from_millis(350)).await;
-            if !matches!(child.try_wait(),Ok(None)) {break;}
-            if let Ok(Ok(tools))=tokio::time::timeout(Duration::from_secs(2),crate::desktop_bridge::probe(port)).await {
-                if ["Snapshot","Screenshot","Click","Type","Scroll","Shortcut","App"]
-                    .iter().all(|expected|tools.iter().any(|tool|tool==expected)) {
-                    healthy=true;break;
+            if !matches!(child.try_wait(), Ok(None)) {
+                break;
+            }
+            if let Ok(Ok(tools)) =
+                tokio::time::timeout(Duration::from_secs(2), crate::desktop_bridge::probe(port))
+                    .await
+            {
+                if [
+                    "Snapshot",
+                    "Screenshot",
+                    "Click",
+                    "Type",
+                    "Scroll",
+                    "Shortcut",
+                    "App",
+                ]
+                .iter()
+                .all(|expected| tools.iter().any(|tool| tool == expected))
+                {
+                    healthy = true;
+                    break;
                 }
             }
         }
         if !healthy {
-            let _=child.kill().await;
-            return Err(Problem::new(StatusCode::BAD_GATEWAY,"Windows-MCP failed health check",
-                "The new process did not expose all seven UI tools on 127.0.0.1. It was stopped."));
+            let _ = child.kill().await;
+            return Err(Problem::new(
+                StatusCode::BAD_GATEWAY,
+                "Windows-MCP failed health check",
+                "The new process did not expose all seven UI tools on 127.0.0.1. It was stopped.",
+            ));
         }
-        *guard=Some(OwnedWindowsMcp{port,child});
-        Ok(Json(json!({"started":true,"managedByChatCmd":true,"alreadyRunning":false,"port":port})))
+        *guard = Some(OwnedWindowsMcp { port, child });
+        Ok(Json(
+            json!({"started":true,"managedByChatCmd":true,"alreadyRunning":false,"port":port}),
+        ))
     }
 }
 
@@ -123,23 +209,40 @@ pub(super) async fn stop_desktop_server(
 ) -> Result<Json<Value>, Problem> {
     #[cfg(not(windows))]
     {
-        let _=state;
-        Err(Problem::new(StatusCode::NOT_IMPLEMENTED,"Windows only","No managed Windows-MCP server on this platform."))
+        let _ = state;
+        Err(Problem::new(
+            StatusCode::NOT_IMPLEMENTED,
+            "Windows only",
+            "No managed Windows-MCP server on this platform.",
+        ))
     }
     #[cfg(windows)]
     {
-        let mut guard=owned_server().lock().await;
-        let Some(mut owned)=guard.take() else {
-            return Err(Problem::new(StatusCode::CONFLICT,"No managed server",
-                "ChatCMD can stop only Windows-MCP processes it started in this session."));
+        let mut guard = owned_server().lock().await;
+        let Some(mut owned) = guard.take() else {
+            return Err(Problem::new(
+                StatusCode::CONFLICT,
+                "No managed server",
+                "ChatCMD can stop only Windows-MCP processes it started in this session.",
+            ));
         };
-        if matches!(owned.child.try_wait(),Ok(None)) {
-            owned.child.kill().await.map_err(|_|Problem::new(StatusCode::BAD_GATEWAY,
-                "Cannot stop Windows-MCP","The managed process could not be stopped."))?;
+        if matches!(owned.child.try_wait(), Ok(None)) {
+            owned.child.kill().await.map_err(|_| {
+                Problem::new(
+                    StatusCode::BAD_GATEWAY,
+                    "Cannot stop Windows-MCP",
+                    "The managed process could not be stopped.",
+                )
+            })?;
         }
         // Stopping the integrated service revokes unattended desktop control.
-        sqlx::query("DELETE FROM desktop_task_trust").execute(state.repository.pool()).await.map_err(db_problem)?;
-        Ok(Json(json!({"stopped":true,"managedByChatCmd":false,"port":owned.port})))
+        sqlx::query("DELETE FROM desktop_task_trust")
+            .execute(state.repository.pool())
+            .await
+            .map_err(db_problem)?;
+        Ok(Json(
+            json!({"stopped":true,"managedByChatCmd":false,"port":owned.port}),
+        ))
     }
 }
 
@@ -357,8 +460,21 @@ mod tests {
 
     #[test]
     fn launcher_is_loopback_only_and_tool_limited() {
-        let args=limited_start_args(8765);
-        assert_eq!(args,["serve","--transport","streamable-http","--host","127.0.0.1","--port","8765","--tools","Snapshot,Screenshot,Click,Type,Scroll,Shortcut,App"]);
+        let args = limited_start_args(8765);
+        assert_eq!(
+            args,
+            [
+                "serve",
+                "--transport",
+                "streamable-http",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8765",
+                "--tools",
+                "Snapshot,Screenshot,Click,Type,Scroll,Shortcut,App"
+            ]
+        );
     }
 
     #[test]
